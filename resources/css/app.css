@@ -1,0 +1,64 @@
+@import "bootstrap/dist/css/bootstrap.min.css";
+
+:root {
+  --ayla-cream: #e5dac4;
+  --ayla-taupe: #b5a596;
+  --ayla-rose: #bc9d88;
+  --ayla-dark: #7f6f61;
+  --ayla-dark-hover: #635549;
+  --ayla-bg-light: #fbf9f5;
+  --ayla-card-border: rgba(127, 111, 97, 0.12);
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background-color: var(--ayla-bg-light);
+  color: var(--ayla-dark);
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, .brand-font {
+  font-family: 'Playfair Display', serif;
+}
+
+.bg-ayla-cream { background-color: var(--ayla-cream) !important; color: var(--ayla-dark); }
+.bg-ayla-taupe { background-color: var(--ayla-taupe) !important; color: #ffffff; }
+.bg-ayla-rose { background-color: var(--ayla-rose) !important; color: #ffffff; }
+.bg-ayla-dark { background-color: var(--ayla-dark) !important; color: #ffffff; }
+
+.text-ayla-dark { color: var(--ayla-dark) !important; }
+.text-ayla-rose { color: var(--ayla-rose) !important; }
+
+.btn-ayla-primary {
+  background-color: var(--ayla-dark);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1.25rem;
+  font-weight: 500;
+}
+.btn-ayla-primary:hover {
+  background-color: var(--ayla-dark-hover);
+  color: #ffffff;
+}
+
+.btn-ayla-secondary {
+  background-color: var(--ayla-rose);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1.25rem;
+  font-weight: 500;
+}
+
+.card-ayla {
+  background-color: #ffffff;
+  border: 1px solid var(--ayla-card-border);
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(127, 111, 97, 0.05);
+}
+
+.navbar-ayla {
+  background-color: #ffffff;
+  border-bottom: 2px solid var(--ayla-cream);
+}
