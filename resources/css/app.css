@@ -1,4 +1,5 @@
 @import "bootstrap/dist/css/bootstrap.min.css";
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..700;1,400..700&family=Poppins:wght@300;400;500;600;700&display=swap');
 
 :root {
   --ayla-cream: #e5dac4;
@@ -17,18 +18,27 @@ body {
   min-height: 100vh;
 }
 
-h1, h2, h3, h4, h5, .brand-font {
+h1, h2, h3, h4, h5, h6, .brand-font {
   font-family: 'Playfair Display', serif;
 }
 
+/* Colores de Fondo */
 .bg-ayla-cream { background-color: var(--ayla-cream) !important; color: var(--ayla-dark); }
 .bg-ayla-taupe { background-color: var(--ayla-taupe) !important; color: #ffffff; }
 .bg-ayla-rose { background-color: var(--ayla-rose) !important; color: #ffffff; }
 .bg-ayla-dark { background-color: var(--ayla-dark) !important; color: #ffffff; }
+.bg-ayla-light { background-color: var(--ayla-bg-light) !important; }
 
+/* Colores de Texto */
 .text-ayla-dark { color: var(--ayla-dark) !important; }
 .text-ayla-rose { color: var(--ayla-rose) !important; }
+.text-ayla-taupe { color: var(--ayla-taupe) !important; }
 
+/* Bordes */
+.border-ayla-rose { border-color: var(--ayla-rose) !important; }
+.border-ayla-cream { border-color: var(--ayla-cream) !important; }
+
+/* Botones */
 .btn-ayla-primary {
   background-color: var(--ayla-dark);
   color: #ffffff;
@@ -36,6 +46,7 @@ h1, h2, h3, h4, h5, .brand-font {
   border-radius: 8px;
   padding: 0.5rem 1.25rem;
   font-weight: 500;
+  transition: all 0.2s ease;
 }
 .btn-ayla-primary:hover {
   background-color: var(--ayla-dark-hover);
@@ -49,8 +60,26 @@ h1, h2, h3, h4, h5, .brand-font {
   border-radius: 8px;
   padding: 0.5rem 1.25rem;
   font-weight: 500;
+  transition: all 0.2s ease;
+}
+.btn-ayla-secondary:hover {
+  background-color: #a78873;
+  color: #ffffff;
 }
 
+.btn-ayla-outline {
+  background-color: transparent;
+  color: var(--ayla-dark);
+  border: 1px solid var(--ayla-dark);
+  border-radius: 8px;
+  font-weight: 500;
+}
+.btn-ayla-outline:hover {
+  background-color: var(--ayla-cream);
+  color: var(--ayla-dark);
+}
+
+/* Tarjetas */
 .card-ayla {
   background-color: #ffffff;
   border: 1px solid var(--ayla-card-border);
@@ -58,7 +87,26 @@ h1, h2, h3, h4, h5, .brand-font {
   box-shadow: 0 4px 15px rgba(127, 111, 97, 0.05);
 }
 
-.navbar-ayla {
-  background-color: #ffffff;
-  border-bottom: 2px solid var(--ayla-cream);
+/* Tablas Personalizadas (Ayla) */
+.table-ayla {
+  border-collapse: separate;
+  border-spacing: 0;
 }
+.table-ayla thead th {
+  background-color: var(--ayla-cream) !important;
+  color: var(--ayla-dark) !important;
+  font-weight: 600;
+  border: none;
+  padding: 14px 18px;
+}
+.table-ayla tbody td {
+  padding: 14px 18px;
+  vertical-align: middle;
+  border-bottom: 1px solid rgba(127, 111, 97, 0.08);
+}
+
+/* Badges */
+.badge-ayla-cream { background-color: var(--ayla-cream); color: var(--ayla-dark); }
+.badge-ayla-dark { background-color: var(--ayla-dark); color: #ffffff; }
+.badge-ayla-rose { background-color: var(--ayla-rose); color: #ffffff; }
+.badge-ayla-taupe { background-color: var(--ayla-taupe); color: #ffffff; }

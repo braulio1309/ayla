@@ -13,10 +13,10 @@ use Inertia\Inertia;
 
 
 // Rutas protegidas (Requieren autenticación)
-Route::middleware([])->group(function () {
+Route::middleware(['auth'])->group(function () {
     
     // Dashboard principal
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
     // Módulo de Agenda y Turnos
     Route::get('/agenda', [AgendaController::class, 'index'])->name('agenda.index');
@@ -32,6 +32,8 @@ Route::middleware([])->group(function () {
 
     // Módulo de Usuarios y Especialistas
     Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
+    Route::post('/usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
+    Route::put('/usuarios/{usuario}', [UsuarioController::class, 'update'])->name('usuarios.update');
     Route::get('/panel-especialista', [UsuarioController::class, 'especialistaPanel'])->name('especialista.panel');
 
     // Módulo de Reportes

@@ -2,21 +2,33 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ReporteService;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
 
 class ReporteController extends Controller
 {
-    public function index()
+    protected $reporteService;
+
+    public function __construct(ReporteService $reporteService)
     {
+        $this->reporteService = $reporteService;
+    }
+
+    public function index(Request $request)
+    {
+        $periodo = $request->input('periodo', 'agosto_2026');
+        $especialistaId = $request->input('especialista_id', '');
+        $servicioId = $request->input('servicio_id', '');
+
+        $data = $this->reporteService->getReporteData($periodo, $especialistaId ? (int) $especialistaId : null, $servicioId ? (int) $servicioId : null);
+
         return Inertia::render('Reportes', [
-            'ingresos_brutos' => 1280.00,
-            'citas_completadas' => 64,
-            'desglose_especialistas' => [
-                ['nombre' => 'Dra. Elena Gómez', 'categoria' => 'Cosmiatría', 'citas' => 28, 'monto' => 580.00, 'porcentaje' => 45.3],
-                ['nombre' => 'Dra. Maria Perez', 'categoria' => 'Masajes & Spa', 'citas' => 20, 'monto' => 420.00, 'porcentaje' => 32.8],
-                ['nombre' => 'Lcda. Sofia Torres', 'categoria' => 'Estética / Manos', 'citas' => 16, 'monto' => 280.00, 'porcentaje' => 21.9],
-            ]
+            'filters' => $data['filters'],
+            'kpis' => $data['kpis'],
+            'auditoria_especialistas' => $data['auditoria_especialistas'],
+            'especialistas_lista' => $data['especialistas_lista'],
+            'servicios_lista' => $data['servicios_lista'],
         ]);
     }
 }

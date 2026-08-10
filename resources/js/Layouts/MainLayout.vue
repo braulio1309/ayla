@@ -1,6 +1,9 @@
 <template>
   <div class="d-flex flex-column min-vh-100">
     <nav class="navbar navbar-expand-lg navbar-ayla sticky-top py-2">
+      <div v-if="flashMessage" class="w-100 bg-success text-white small px-4 py-2 text-center">
+        {{ flashMessage }}
+      </div>
       <div class="container-fluid px-4">
         <Link class="navbar-brand d-flex align-items-center" href="/dashboard">
           <div class="bg-ayla-cream rounded-circle p-2 me-2 d-flex align-items-center justify-content-center" style="width: 42px; height: 42px;">
@@ -16,22 +19,22 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarMain">
           <ul class="navbar-nav mx-auto mb-2 mb-lg-0">
-            <li class="nav-item"><Link class="nav-link" :class="{ active: $page.component === 'Dashboard' }" href="/dashboard"><i class="bi bi-grid-1x2-fill me-1"></i> Dashboard</Link></li>
+            <li class="nav-item"><Link class="nav-link" :class="{ active: $page.component === 'Dashboard' }" href="/"><i class="bi bi-grid-1x2-fill me-1"></i> Dashboard</Link></li>
             <li class="nav-item"><Link class="nav-link" :class="{ active: $page.component === 'Agenda' }" href="/agenda"><i class="bi bi-calendar3 me-1"></i> Agenda & Turnos</Link></li>
-            <li class="nav-item"><Link class="nav-link" :class="{ active: $page.component === 'Pacientes' }" href="/pacientes"><i class="bi bi-people-fill me-1"></i> Pacientes</Link></li>
-            <li class="nav-item"><Link class="nav-link" :class="{ active: $page.component === 'Servicios' }" href="/servicios"><i class="bi bi-flower1 me-1"></i> Servicios</Link></li>
-            <li class="nav-item"><Link class="nav-link" :class="{ active: $page.component === 'Usuarios' }" href="/usuarios"><i class="bi bi-shield-lock-fill me-1"></i> Usuarios & Roles</Link></li>
+            <li v-if="isAdmin" class="nav-item"><Link class="nav-link" :class="{ active: $page.component === 'Pacientes' }" href="/pacientes"><i class="bi bi-people-fill me-1"></i> Pacientes</Link></li>
+            <li v-if="isAdmin" class="nav-item"><Link class="nav-link" :class="{ active: $page.component === 'Servicios' }" href="/servicios"><i class="bi bi-flower1 me-1"></i> Servicios</Link></li>
+            <li v-if="isAdmin" class="nav-item"><Link class="nav-link" :class="{ active: $page.component === 'Usuarios' }" href="/usuarios"><i class="bi bi-shield-lock-fill me-1"></i> Usuarios & Roles</Link></li>
             <li class="nav-item"><Link class="nav-link" :class="{ active: $page.component === 'PanelEspecialista' }" href="/panel-especialista"><i class="bi bi-person-badge-fill me-1"></i> Mi Panel</Link></li>
-            <li class="nav-item"><Link class="nav-link" :class="{ active: $page.component === 'Reportes' }" href="/reportes"><i class="bi bi-graph-up-arrow me-1"></i> Finanzas</Link></li>
+            <li v-if="isAdmin" class="nav-item"><Link class="nav-link" :class="{ active: $page.component === 'Reportes' }" href="/reportes"><i class="bi bi-graph-up-arrow me-1"></i> Finanzas</Link></li>
           </ul>
           <div class="d-flex align-items-center gap-3">
             <div class="text-end d-none d-xl-block">
-              <div class="fw-bold text-ayla-dark small">Braulio Zapata</div>
-              <span class="badge bg-ayla-dark fw-light" style="font-size: 0.7rem;">Administrador</span>
+              <div class="fw-bold text-ayla-dark small">{{ authUser?.name || 'Usuario' }}</div>
+              <span class="badge bg-ayla-dark fw-light" style="font-size: 0.7rem;">{{ userRoleLabel }}</span>
             </div>
-            <Link href="/login" method="post" as="button" class="btn btn-outline-danger btn-sm rounded-pill px-3">
+            <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" @click="cerrarSesion">
               <i class="bi bi-box-arrow-right me-1"></i> Salir
-            </Link>
+            </button>
           </div>
         </div>
       </div>
@@ -48,5 +51,32 @@
 </template>
 
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
+
+const page = usePage();
+const authUser = computed(() => page.props.auth?.user || null);
+const flashMessage = computed(() => page.props.flash?.success || '');
+const userRoleLabel = computed(() => {
+  const role = authUser.value?.role;
+  if (role === 'admin') return 'Administrador';
+  if (role === 'especialista') return 'Especialista';
+  return 'Usuario';
+});
+const isAdmin = computed(() => authUser.value?.role === 'admin');
+
+const cerrarSesion = () => {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = route('logout');
+
+  const csrf = document.createElement('input');
+  csrf.type = 'hidden';
+  csrf.name = '_token';
+  csrf.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+  form.appendChild(csrf);
+  document.body.appendChild(form);
+  form.submit();
+};
 </script>

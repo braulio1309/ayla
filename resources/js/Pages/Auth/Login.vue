@@ -1,100 +1,55 @@
-<script setup>
-import Checkbox from '@/Components/Checkbox.vue';
-import GuestLayout from '@/Layouts/GuestLayout.vue';
-import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+<template>
+  <div class="bg-ayla-cream d-flex align-items-center justify-content-center min-vh-100 py-5">
+    <div class="card-ayla p-4 text-center shadow-lg border-0" style="max-width: 380px; width: 100%;">
+      <div v-if="statusMessage" :class="['alert py-2 mb-3 small', statusType === 'success' ? 'alert-success' : 'alert-danger']">
+        {{ statusMessage }}
+      </div>
+      <h1 class="brand-font fw-bold text-ayla-dark mb-0">ayla</h1>
+      <p class="text-muted small mb-4">CENTRO MÉDICO • BELLEZA & SPA</p>
+      <form @submit.prevent="submit">
+        <div class="mb-3 text-start">
+          <label class="form-label small fw-medium">Correo Electrónico</label>
+          <input type="email" class="form-control" v-model="form.email" required>
+        </div>
+        <div class="mb-3 text-start">
+          <label class="form-label small fw-medium">Contraseña</label>
+          <input type="password" class="form-control" v-model="form.password" required>
+        </div>
+        <button type="submit" class="btn btn-ayla-primary w-100 py-2" :disabled="form.processing">
+          {{ form.processing ? 'Ingresando...' : 'Ingresar al Sistema' }}
+        </button>
+      </form>
+    </div>
+  </div>
+</template>
 
-defineProps({
-    canResetPassword: {
-        type: Boolean,
-    },
-    status: {
-        type: String,
-    },
-});
+<script setup>
+import { useForm, usePage } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+
+const page = usePage();
+const flashMessage = computed(() => page.props.flash?.success || '');
+const statusMessage = ref('');
+const statusType = ref('success');
 
 const form = useForm({
-    email: '',
-    password: '',
-    remember: false,
+  email: '',
+  password: '',
 });
 
 const submit = () => {
-    form.post(route('login'), {
-        onFinish: () => form.reset('password'),
-    });
+  statusMessage.value = '';
+  form.clearErrors();
+
+  form.post('/login', {
+    onSuccess: () => {
+      statusType.value = 'success';
+      statusMessage.value = flashMessage.value || 'Inicio de sesión correcto. Bienvenido(a).';
+    },
+    onError: (errors) => {
+      statusType.value = 'danger';
+      statusMessage.value = errors.email || errors.password || 'No fue posible iniciar sesión. Verifica tus credenciales.';
+    },
+  });
 };
 </script>
-
-<template>
-    <GuestLayout>
-        <Head title="Log in" />
-
-        <div v-if="status" class="mb-4 text-sm font-medium text-green-600">
-            {{ status }}
-        </div>
-
-        <form @submit.prevent="submit">
-            <div>
-                <InputLabel for="email" value="Email" />
-
-                <TextInput
-                    id="email"
-                    type="email"
-                    class="mt-1 block w-full"
-                    v-model="form.email"
-                    required
-                    autofocus
-                    autocomplete="username"
-                />
-
-                <InputError class="mt-2" :message="form.errors.email" />
-            </div>
-
-            <div class="mt-4">
-                <InputLabel for="password" value="Password" />
-
-                <TextInput
-                    id="password"
-                    type="password"
-                    class="mt-1 block w-full"
-                    v-model="form.password"
-                    required
-                    autocomplete="current-password"
-                />
-
-                <InputError class="mt-2" :message="form.errors.password" />
-            </div>
-
-            <div class="mt-4 block">
-                <label class="flex items-center">
-                    <Checkbox name="remember" v-model:checked="form.remember" />
-                    <span class="ms-2 text-sm text-gray-600"
-                        >Remember me</span
-                    >
-                </label>
-            </div>
-
-            <div class="mt-4 flex items-center justify-end">
-                <Link
-                    v-if="canResetPassword"
-                    :href="route('password.request')"
-                    class="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                >
-                    Forgot your password?
-                </Link>
-
-                <PrimaryButton
-                    class="ms-4"
-                    :class="{ 'opacity-25': form.processing }"
-                    :disabled="form.processing"
-                >
-                    Log in
-                </PrimaryButton>
-            </div>
-        </form>
-    </GuestLayout>
-</template>
