@@ -4,6 +4,9 @@
       <div v-if="flashMessage" class="w-100 bg-success text-white small px-4 py-2 text-center">
         {{ flashMessage }}
       </div>
+      <div v-if="notificationMessage" class="w-100 bg-ayla-rose text-white small px-4 py-2 text-center">
+        <i class="bi bi-bell-fill me-2"></i>{{ notificationMessage }}
+      </div>
       <div class="container-fluid px-4">
         <Link class="navbar-brand d-flex align-items-center" href="/dashboard">
           <div class="bg-ayla-cream rounded-circle p-2 me-2 d-flex align-items-center justify-content-center" style="width: 42px; height: 42px;">
@@ -57,6 +60,20 @@ import { computed } from 'vue';
 const page = usePage();
 const authUser = computed(() => page.props.auth?.user || null);
 const flashMessage = computed(() => page.props.flash?.success || '');
+const notificationMessage = computed(() => {
+  const flashNotification = page.props.flash?.notification || '';
+  if (flashNotification) {
+    return flashNotification;
+  }
+
+  const notifications = page.props.auth?.notifications || [];
+  if (!notifications.length) {
+    return '';
+  }
+
+  const latest = notifications[0];
+  return latest.message || '';
+});
 const userRoleLabel = computed(() => {
   const role = authUser.value?.role;
   if (role === 'admin') return 'Administrador';

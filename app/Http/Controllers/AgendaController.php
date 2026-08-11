@@ -5,11 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Cita;
 use App\Models\Paciente;
 use App\Models\Servicio;
+use App\Models\User;
 use App\Services\AgendaService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
+use App\Notifications\NuevaCitaAsignada;
 
 class AgendaController extends Controller
 {
@@ -95,6 +98,16 @@ class AgendaController extends Controller
                 'precio_momento' => (float) ($servicio->precio_base ?? 0),
                 'duracion_momento' => (int) ($servicio->duracion_min ?? 0),
             ]);
+        }
+
+        $especialistaAsignado = User::find($validated['especialista_id']);
+        if ($especialistaAsignado && $especialistaAsignado->id !== Auth::id()) {
+            Notification::send($especialistaAsignado, new NuevaCitaAsignada($cita, $paciente, $serviciosSeleccionados));
+
+            return redirect()->route('agenda.index', [
+                'fecha' => $validated['fecha'],
+                'especialista_id' => $validated['especialista_id'],
+            ])->with('success', 'Turno agendado exitosamente.')->with('notification', 'Se te asignó una nueva cita para ' . $paciente->nombre);
         }
 
         return redirect()->route('agenda.index', [
