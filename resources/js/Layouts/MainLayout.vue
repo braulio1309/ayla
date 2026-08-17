@@ -1,12 +1,25 @@
 <template>
   <div class="d-flex flex-column min-vh-100">
+    <div v-if="toast.visible" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080;">
+      <div
+        class="toast show align-items-center border-0 shadow-lg"
+        :class="toast.type === 'success' ? 'text-white bg-success' : 'text-white bg-info'"
+        role="alert"
+        aria-live="assertive"
+        aria-atomic="true"
+        :style="toastStyle"
+      >
+        <div class="d-flex">
+          <div class="toast-body d-flex align-items-center">
+            <i :class="toast.type === 'success' ? 'bi bi-check-circle-fill me-2' : 'bi bi-bell-fill me-2'"></i>
+            {{ toast.message }}
+          </div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" aria-label="Cerrar" @click="toast.visible = false"></button>
+        </div>
+      </div>
+    </div>
+
     <nav class="navbar navbar-expand-lg navbar-ayla sticky-top py-2">
-      <div v-if="flashMessage" class="w-100 bg-success text-white small px-4 py-2 text-center">
-        {{ flashMessage }}
-      </div>
-      <div v-if="notificationMessage" class="w-100 bg-ayla-rose text-white small px-4 py-2 text-center">
-        <i class="bi bi-bell-fill me-2"></i>{{ notificationMessage }}
-      </div>
       <div class="container-fluid px-4">
         <Link class="navbar-brand d-flex align-items-center" href="/dashboard">
           <div class="bg-ayla-cream rounded-circle p-2 me-2 d-flex align-items-center justify-content-center" style="width: 42px; height: 42px;">
@@ -55,7 +68,7 @@
 
 <script setup>
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const page = usePage();
 const authUser = computed(() => page.props.auth?.user || null);
@@ -74,6 +87,54 @@ const notificationMessage = computed(() => {
   const latest = notifications[0];
   return latest.message || '';
 });
+
+const toast = ref({
+  visible: false,
+  type: 'success',
+  message: ''
+});
+
+const toastStyle = computed(() => ({
+  animation: 'toast-in-right 0.45s ease, toast-out-right 0.45s ease 3.1s forwards'
+}));
+
+let toastTimer = null;
+
+const showToast = (type, message) => {
+  if (!message) {
+    return;
+  }
+
+  toast.value = {
+    visible: true,
+    type,
+    message,
+  };
+
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+  }
+
+  toastTimer = setTimeout(() => {
+    toast.value.visible = false;
+  }, 3500);
+};
+
+watch(
+  () => [flashMessage.value, notificationMessage.value],
+  ([successMessage, notificationText]) => {
+    if (successMessage) {
+      showToast('success', successMessage);
+      return;
+    }
+
+    if (notificationText) {
+      showToast('info', notificationText);
+    }
+  },
+  { immediate: true }
+);
+
 const userRoleLabel = computed(() => {
   const role = authUser.value?.role;
   if (role === 'admin') return 'Administrador';

@@ -55,6 +55,35 @@ class AgendaService
         })->values()->all();
 
         $calendario = $this->buildCalendarioData($fechaCarbon, $usuarioActual, $especialistaId, $estado);
+        $serviciosLista = Servicio::with(['especialistas' => function ($query) use ($especialistaId, $usuarioActual) {
+            if ($especialistaId) {
+                $query->where('users.id', $especialistaId);
+            } elseif ($usuarioActual && $usuarioActual->role === 'especialista') {
+                $query->where('users.id', $usuarioActual->id);
+            }
+        }])->get()->map(function ($s) use ($especialistaId, $usuarioActual) {
+            $especialistaAsignado = $especialistaId
+                ? $s->especialistas->first()
+                : ($usuarioActual && $usuarioActual->role === 'especialista'
+                    ? $s->especialistas->first()
+                    : null);
+
+            $precio = $especialistaAsignado
+                ? (float) ($especialistaAsignado->pivot->precio_especialista ?? $s->precio_base ?? 0)
+                : (float) ($s->precio_base ?? 0);
+
+            return [
+                'id' => $s->id,
+                'nombre' => $s->nombre,
+                'precio' => $precio,
+                'duracion' => (int) ($s->duracion_min ?? 0),
+                'especialistas' => $s->especialistas->map(fn ($u) => [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'precio_especialista' => (float) ($u->pivot->precio_especialista ?? $s->precio_base ?? 0),
+                ])->values()->all(),
+            ];
+        })->values()->all();
 
         return [
             'filters' => [
@@ -69,12 +98,7 @@ class AgendaService
                 'nombre' => $p->nombre,
                 'cedula' => $p->cedula,
             ])->all(),
-            'servicios_lista' => Servicio::select('id', 'nombre', 'precio_base', 'duracion_min')->get()->map(fn ($s) => [
-                'id' => $s->id,
-                'nombre' => $s->nombre,
-                'precio' => (float) ($s->precio_base ?? 0),
-                'duracion' => (int) ($s->duracion_min ?? 0),
-            ])->all(),
+            'servicios_lista' => $serviciosLista,
             'especialistas_lista' => User::where('role', 'especialista')->select('id', 'name')->get()->map(fn ($u) => [
                 'id' => $u->id,
                 'name' => $u->name,

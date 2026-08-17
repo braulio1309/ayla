@@ -152,6 +152,13 @@
                     <option :value="false">Inactivo</option>
                   </select>
                 </div>
+
+                <div class="col-12" v-if="formUsuario.role === 'especialista'">
+                  <label class="form-label fw-medium">Comisión del especialista (%)</label>
+                  <input type="number" min="0" max="100" step="0.1" class="form-control" v-model.number="formUsuario.comision" placeholder="Ej. 35">
+                  <small class="text-muted">Entre 0 y 100. El resto queda para el negocio.</small>
+                  <span v-if="formUsuario.errors.comision" class="text-danger small">{{ formUsuario.errors.comision }}</span>
+                </div>
               </div>
             </div>
             <div class="modal-footer border-top">
@@ -213,7 +220,8 @@ const formUsuario = useForm({
   email: '',
   password: '',
   role: 'especialista',
-  is_active: true
+  is_active: true,
+  comision: 0
 });
 
 const abrirModalCrear = () => {
@@ -232,6 +240,7 @@ const abrirModalEditar = (usuario) => {
   formUsuario.password = ''; // Opcional en edición
   formUsuario.role = usuario.role;
   formUsuario.is_active = usuario.is_active;
+  formUsuario.comision = usuario.comision ?? 0;
 };
 
 const guardarUsuario = () => {

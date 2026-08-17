@@ -49,7 +49,11 @@ class AgendaController extends Controller
             'servicios' => 'required|array|min:1',
             'fecha' => 'required|date',
             'hora_inicio' => 'required',
-            'holgura_min' => 'required|numeric'
+            'holgura_min' => 'required|numeric',
+            'recurrencia' => 'nullable|string|in:ninguna,semanal,quincenal,mensual',
+            'dias_semana' => 'nullable|array',
+            'dias_semana.*' => 'integer|min:0|max:6',
+            'cantidad_sesiones' => 'nullable|integer|min:1|max:60',
         ]);
 
         $paciente = Paciente::findOrFail($validated['paciente_id']);
@@ -68,52 +72,176 @@ class AgendaController extends Controller
             return (int) ($servicio->duracion_min ?? 0);
         });
 
-        $conflicto = $this->buscarConflicto($validated['paciente_id'], $validated['especialista_id'], $validated['fecha'], $request->hora_inicio, $validated['holgura_min'], $duracionTotal);
-        if ($conflicto) {
-            return redirect()->back()->withErrors(['disponibilidad' => 'No se puede agendar porque ' . $conflicto])->withInput();
+        $recurrencia = $validated['recurrencia'] ?? 'ninguna';
+        $diasSemana = array_values(array_unique(array_map('intval', $validated['dias_semana'] ?? [])));
+        $cantidadSesiones = max(1, (int) ($validated['cantidad_sesiones'] ?? 1));
+        $fechasAgenda = $this->generarFechasRecurrencia($validated['fecha'], $recurrencia, $cantidadSesiones, $diasSemana);
+
+        foreach ($fechasAgenda as $fechaCita) {
+            $conflicto = $this->buscarConflicto(
+                $validated['paciente_id'],
+                $validated['especialista_id'],
+                $fechaCita,
+                $request->hora_inicio,
+                $validated['holgura_min'],
+                $duracionTotal
+            );
+
+            if ($conflicto) {
+                return redirect()->back()->withErrors(['disponibilidad' => 'No se puede agendar porque ' . $conflicto])->withInput();
+            }
         }
 
-        $precioTotal = $serviciosSeleccionados->sum(function ($servicio) {
-            return (float) ($servicio->precio_base ?? 0);
+        $precioTotal = $serviciosSeleccionados->sum(function ($servicio) use ($validated) {
+            return (float) $servicio->getPrecioParaEspecialista((int) $validated['especialista_id']);
         });
 
-        $horaInicio = Carbon::createFromFormat('H:i', $request->hora_inicio);
-        $horaFin = $horaInicio->copy()->addMinutes($duracionTotal + (int) $request->holgura_min);
+        $citasCreadas = [];
+        foreach ($fechasAgenda as $fechaCita) {
+            $fechaCarbon = Carbon::parse($fechaCita);
+            $horaInicio = Carbon::parse($fechaCarbon->format('Y-m-d') . ' ' . $request->hora_inicio);
+            $horaFin = $horaInicio->copy()->addMinutes($duracionTotal + (int) $validated['holgura_min']);
 
-        $cita = Cita::create([
-            'paciente_id' => $paciente->id,
-            'user_id' => $validated['especialista_id'],
-            'fecha' => $validated['fecha'],
-            'hora_inicio' => $horaInicio->format('H:i:s'),
-            'hora_fin' => $horaFin->format('H:i:s'),
-            'holgura_min' => (int) $validated['holgura_min'],
-            'monto_total' => $precioTotal,
-            'estado' => 'confirmado',
-            'cabina' => null,
-            'observaciones' => 'Cita creada desde la agenda',
-        ]);
-
-        foreach ($serviciosSeleccionados as $servicio) {
-            $cita->servicios()->attach($servicio->id, [
-                'precio_momento' => (float) ($servicio->precio_base ?? 0),
-                'duracion_momento' => (int) ($servicio->duracion_min ?? 0),
+            $cita = Cita::create([
+                'paciente_id' => $paciente->id,
+                'user_id' => $validated['especialista_id'],
+                'fecha' => $fechaCarbon->format('Y-m-d'),
+                'hora_inicio' => $horaInicio->format('H:i:s'),
+                'hora_fin' => $horaFin->format('H:i:s'),
+                'holgura_min' => (int) $validated['holgura_min'],
+                'monto_total' => $precioTotal,
+                'estado' => $this->mapEstadoParaBaseDatos('Confirmado'),
+                'cabina' => null,
+                'observaciones' => count($fechasAgenda) > 1 ? 'Turno recurrente agendado desde la agenda.' : 'Cita creada desde la agenda',
             ]);
+
+            foreach ($serviciosSeleccionados as $servicio) {
+                $cita->servicios()->attach($servicio->id, [
+                    'precio_momento' => (float) $servicio->getPrecioParaEspecialista((int) $validated['especialista_id']),
+                    'duracion_momento' => (int) ($servicio->duracion_min ?? 0),
+                ]);
+            }
+
+            $citasCreadas[] = $cita;
         }
 
+        $primerFecha = $fechasAgenda[0] ?? $validated['fecha'];
         $especialistaAsignado = User::find($validated['especialista_id']);
-        if ($especialistaAsignado && $especialistaAsignado->id !== Auth::id()) {
-            Notification::send($especialistaAsignado, new NuevaCitaAsignada($cita, $paciente, $serviciosSeleccionados));
+        $mensajeExito = count($citasCreadas) > 1
+            ? 'Serie de turnos creada correctamente: ' . count($citasCreadas) . ' sesiones agendadas.'
+            : 'Turno agendado exitosamente.';
+
+        if ($especialistaAsignado) {
+            foreach ($citasCreadas as $citaCreada) {
+                Notification::send($especialistaAsignado, new NuevaCitaAsignada($citaCreada, $paciente, $serviciosSeleccionados));
+            }
+
+            if ($especialistaAsignado->id !== Auth::id()) {
+                return redirect()->route('agenda.index', [
+                    'fecha' => $primerFecha,
+                    'especialista_id' => $validated['especialista_id'],
+                ])->with('success', $mensajeExito)->with('notification', 'Se te asignó una nueva cita para ' . $paciente->nombre);
+            }
 
             return redirect()->route('agenda.index', [
-                'fecha' => $validated['fecha'],
+                'fecha' => $primerFecha,
                 'especialista_id' => $validated['especialista_id'],
-            ])->with('success', 'Turno agendado exitosamente.')->with('notification', 'Se te asignó una nueva cita para ' . $paciente->nombre);
+            ])->with('success', $mensajeExito);
         }
 
         return redirect()->route('agenda.index', [
-            'fecha' => $validated['fecha'],
+            'fecha' => $primerFecha,
             'especialista_id' => $validated['especialista_id'],
-        ])->with('success', 'Turno agendado exitosamente.');
+        ])->with('success', $mensajeExito);
+    }
+
+    public function update(Request $request, Cita $cita)
+    {
+        $user = Auth::user();
+
+        if (!$user || ($user->role !== 'admin' && $cita->user_id !== $user->id)) {
+            abort(403, 'No tienes permisos para actualizar este turno.');
+        }
+
+        $validated = $request->validate([
+            'estado' => 'required|string|in:Confirmado,En Proceso,Completado,Cancelado',
+            'observaciones' => 'nullable|string|max:1000',
+        ]);
+
+        $cita->estado = $this->mapEstadoParaBaseDatos($validated['estado']);
+        $cita->observaciones = trim((string) ($validated['observaciones'] ?? $cita->observaciones ?? '')) ?: $cita->observaciones;
+        $cita->save();
+
+        return redirect()->route('agenda.index', [
+            'fecha' => $cita->fecha ? Carbon::parse($cita->fecha)->format('Y-m-d') : date('Y-m-d'),
+            'especialista_id' => $cita->user_id,
+        ])->with('success', 'Estado del turno actualizado correctamente.');
+    }
+
+    private function mapEstadoParaBaseDatos(string $estado): string
+    {
+        switch ($estado) {
+            case 'Confirmado':
+                return 'confirmado';
+            case 'En Proceso':
+                return 'en_proceso';
+            case 'Completado':
+                return 'completado';
+            case 'Cancelado':
+                return 'cancelado';
+            default:
+                return 'confirmado';
+        }
+    }
+
+    private function generarFechasRecurrencia(string $fechaInicio, string $tipo, int $cantidadSesiones, array $diasSemana): array
+    {
+        if ($tipo === 'ninguna' || $cantidadSesiones <= 1) {
+            return [Carbon::parse($fechaInicio)->format('Y-m-d')];
+        }
+
+        $inicio = Carbon::parse($fechaInicio);
+        $fechas = [];
+
+        if ($tipo === 'mensual') {
+            $fechaActual = $inicio->copy();
+            while (count($fechas) < $cantidadSesiones) {
+                $fechas[] = $fechaActual->format('Y-m-d');
+                $fechaActual = $fechaActual->copy()->addMonth();
+            }
+
+            return $fechas;
+        }
+
+        $diasSeleccionados = $diasSemana;
+        if (empty($diasSeleccionados)) {
+            $diasSeleccionados = [$inicio->dayOfWeek];
+        }
+
+        $diasSeleccionados = array_values(array_unique($diasSeleccionados));
+        sort($diasSeleccionados);
+
+        $semanaActual = $inicio->copy()->startOfWeek(Carbon::MONDAY);
+        $intervalo = $tipo === 'quincenal' ? 2 : 1;
+
+        while (count($fechas) < $cantidadSesiones) {
+            foreach ($diasSeleccionados as $diaSemana) {
+                if (count($fechas) >= $cantidadSesiones) {
+                    break;
+                }
+
+                $fechaPosible = $semanaActual->copy()->addDays($diaSemana);
+                if ($fechaPosible->lt($inicio)) {
+                    continue;
+                }
+
+                $fechas[] = $fechaPosible->format('Y-m-d');
+            }
+
+            $semanaActual->addWeeks($intervalo);
+        }
+
+        return array_slice($fechas, 0, $cantidadSesiones);
     }
 
     private function buscarConflicto($pacienteId, $especialistaId, $fecha, $horaInicio, $holguraMin, $duracionTotal)

@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Models\Cita;
 use App\Models\Paciente;
 use Illuminate\Bus\Queueable;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class NuevaCitaAsignada extends Notification
@@ -24,7 +25,7 @@ class NuevaCitaAsignada extends Notification
 
     public function via($notifiable): array
     {
-        return ['database'];
+        return ['database', 'mail'];
     }
 
     public function toDatabase($notifiable): array
@@ -36,5 +37,17 @@ class NuevaCitaAsignada extends Notification
             'fecha' => $this->cita->fecha->format('Y-m-d'),
             'hora' => $this->cita->hora_inicio,
         ];
+    }
+
+    public function toMail($notifiable): MailMessage
+    {
+        return (new MailMessage)
+            ->subject('Nuevo turno asignado | Ayla')
+            ->view('emails.citas.nueva-cita', [
+                'especialista' => $notifiable,
+                'cita' => $this->cita,
+                'paciente' => $this->paciente,
+                'servicios' => $this->servicios,
+            ]);
     }
 }

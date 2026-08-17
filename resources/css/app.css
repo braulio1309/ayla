@@ -18,6 +18,28 @@ body {
   min-height: 100vh;
 }
 
+@keyframes toast-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(120px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes toast-out-right {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(120px);
+  }
+}
+
 h1, h2, h3, h4, h5, h6, .brand-font {
   font-family: 'Playfair Display', serif;
 }

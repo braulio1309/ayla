@@ -9,12 +9,27 @@
             <span class="badge bg-ayla-rose mb-2 fw-normal px-3 py-1">Perfil Restringido</span>
             <h2 class="brand-font fw-bold text-ayla-dark mb-1">Panel de Rendimiento Personal</h2>
             <p class="text-muted small mb-0">
-              Bienvenida(o), <strong>{{ especialista.nombre }}</strong> ({{ especialista.especialidad }})
+              Bienvenida(o), <strong>{{ especialistaSegura.nombre }}</strong> ({{ especialistaSegura.especialidad }})
             </p>
           </div>
           <div class="text-end">
-            <span class="text-muted small d-block">Su comisión acumulada:</span>
-            <h2 class="brand-font fw-bold text-ayla-dark mb-0">${{ comision_total.toFixed(2) }}</h2>
+            <span class="text-muted small d-block">Tu comisión actual: {{ especialistaSegura.comision }}%</span>
+            <h2 class="brand-font fw-bold text-ayla-dark mb-0">${{ comisionTotalSeguro.toFixed(2) }}</h2>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-4">
+        <div class="col-md-6">
+          <div class="card-ayla p-4 h-100">
+            <span class="small text-muted d-block mb-2">Total generado</span>
+            <h3 class="brand-font fw-bold text-ayla-dark mb-0">${{ totalGeneradoSeguro.toFixed(2) }}</h3>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card-ayla p-4 h-100">
+            <span class="small text-muted d-block mb-2">Negocio</span>
+            <h3 class="brand-font fw-bold text-success mb-0">${{ negocioTotalSeguro.toFixed(2) }}</h3>
           </div>
         </div>
       </div>
@@ -52,13 +67,13 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(a, index) in atenciones" :key="index">
+              <tr v-for="(a, index) in atencionesSeguras" :key="index">
                 <td>{{ a.fecha }}</td>
                 <td class="fw-bold text-ayla-dark">{{ a.paciente }}</td>
                 <td>{{ a.servicio }}</td>
-                <td class="text-end fw-bold text-success">${{ a.monto.toFixed(2) }}</td>
+                <td class="text-end fw-bold text-success">${{ Number(a.monto ?? 0).toFixed(2) }}</td>
               </tr>
-              <tr v-if="atenciones.length === 0">
+              <tr v-if="atencionesSeguras.length === 0">
                 <td colspan="4" class="text-center py-4 text-muted">
                   No se registraron atenciones en el intervalo de fechas seleccionado.
                 </td>
@@ -75,14 +90,22 @@
 <script setup>
 import MainLayout from '../Layouts/MainLayout.vue';
 import { router } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
   especialista: Object,
+  total_generado: Number,
   comision_total: Number,
+  negocio_total: Number,
   atenciones: Array,
   filters: Object
 });
+
+const especialistaSegura = computed(() => props.especialista || { nombre: '', especialidad: '', comision: 0 });
+const totalGeneradoSeguro = computed(() => Number(props.total_generado ?? 0));
+const comisionTotalSeguro = computed(() => Number(props.comision_total ?? 0));
+const negocioTotalSeguro = computed(() => Number(props.negocio_total ?? 0));
+const atencionesSeguras = computed(() => props.atenciones || []);
 
 const filterForm = ref({
   fecha_inicio: props.filters?.fecha_inicio || '2026-08-01',

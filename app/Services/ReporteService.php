@@ -14,7 +14,7 @@ class ReporteService
 
         $citas = Cita::with([
             'especialista' => function ($query) {
-                $query->select('id', 'name', 'role');
+                $query->select('id', 'name', 'role', 'comision');
             },
             'servicios' => function ($query) {
                 $query->select('servicios.id', 'servicios.nombre');
@@ -34,13 +34,16 @@ class ReporteService
         $citas = $citas->get();
         $totalGeneral = (float) $citas->sum('monto_total');
 
-        $auditoria = $citas->groupBy('user_id')->map(function ($items, $especialistaId) use ($totalGeneral) {
+        $auditoria = $citas->groupBy('user_id')->map(function ($items) use ($totalGeneral) {
             $especialista = null;
             if ($items->isNotEmpty() && $items->first()->especialista) {
                 $especialista = $items->first()->especialista;
             }
 
-            $total = $items->sum('monto_total');
+            $total = (float) $items->sum('monto_total');
+            $porcentajeComision = $especialista && $especialista->role === 'especialista' ? (float) ($especialista->comision ?? 0) : 0;
+            $comisionEspecialista = round($total * ($porcentajeComision / 100), 2);
+            $negocio = round($total - $comisionEspecialista, 2);
             $porcentaje = $totalGeneral > 0 ? round(($total / $totalGeneral) * 100, 1) : 0;
             $categoria = 'Sin categoría';
 
@@ -52,10 +55,15 @@ class ReporteService
                 'especialista' => $especialista ? $especialista->name : 'Sin especialista',
                 'categoria' => $categoria,
                 'citas_completadas' => $items->count(),
-                'ingreso_generado' => (float) $total,
+                'ingreso_generado' => round($total, 2),
+                'comision_especialista' => $comisionEspecialista,
+                'ganancia_negocio' => $negocio,
                 'aporte_porcentaje' => $porcentaje . '%',
             ];
         })->values()->all();
+
+        $totalComisionEspecialistas = round(array_sum(array_column($auditoria, 'comision_especialista')), 2);
+        $totalNegocio = round(array_sum(array_column($auditoria, 'ganancia_negocio')), 2);
 
         return [
             'filters' => [
@@ -65,6 +73,8 @@ class ReporteService
             ],
             'kpis' => [
                 'ingresos_brutos' => (float) $citas->sum('monto_total'),
+                'total_comision_especialistas' => $totalComisionEspecialistas,
+                'total_negocio' => $totalNegocio,
                 'total_citas' => $citas->count(),
                 'promedio_cita' => $citas->count() > 0 ? round($citas->sum('monto_total') / $citas->count(), 2) : 0,
                 'top_especialista' => $auditoria[0]['especialista'] ?? 'Sin datos',

@@ -21,6 +21,7 @@ Route::middleware(['auth'])->group(function () {
     // Módulo de Agenda y Turnos
     Route::get('/agenda', [AgendaController::class, 'index'])->name('agenda.index');
     Route::post('/agenda', [AgendaController::class, 'store'])->name('agenda.store');
+    Route::put('/agenda/{cita}', [AgendaController::class, 'update'])->name('agenda.update');
 
     // Módulo de Pacientes
     Route::get('/pacientes', [PacienteController::class, 'index'])->name('pacientes.index');

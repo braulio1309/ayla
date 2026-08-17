@@ -6,6 +6,7 @@ use App\Services\ServicioService;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
 use App\Models\Servicio;
+use App\Models\User;
 
 class ServicioController extends Controller
 {
@@ -27,6 +28,7 @@ class ServicioController extends Controller
             'filters' => $data['filters'],
             'servicios' => $data['servicios'],
             'categorias' => $data['categorias'],
+            'especialistas' => $data['especialistas'],
         ]);
     }
 
@@ -37,10 +39,31 @@ class ServicioController extends Controller
             'categoria' => 'required|string|max:100',
             'precio_base' => 'required|numeric|min:0',
             'duracion_min' => 'required|integer|min:5',
-            'descripcion' => 'nullable|string'
+            'descripcion' => 'nullable|string',
+            'especialistas' => 'nullable|array',
+            'especialistas.*' => 'exists:users,id',
+            'precios_especialistas' => 'nullable|array',
+            'precios_especialistas.*' => 'nullable|numeric|min:0',
         ]);
 
-        Servicio::create($validated);
+        $servicio = Servicio::create([
+            'nombre' => $validated['nombre'],
+            'categoria' => $validated['categoria'],
+            'precio_base' => $validated['precio_base'],
+            'duracion_min' => $validated['duracion_min'],
+            'descripcion' => $validated['descripcion'] ?? null,
+        ]);
+
+        $syncData = [];
+        foreach ($request->input('especialistas', []) as $especialistaId) {
+            $syncData[(int) $especialistaId] = [
+                'precio_especialista' => (float) ($request->input('precios_especialistas.' . $especialistaId, $validated['precio_base'])),
+            ];
+        }
+
+        if (!empty($syncData)) {
+            $servicio->especialistas()->sync($syncData);
+        }
 
         return redirect()->back()->with('success', 'Servicio registrado correctamente.');
     }
@@ -52,10 +75,29 @@ class ServicioController extends Controller
             'categoria' => 'required|string|max:100',
             'precio_base' => 'required|numeric|min:0',
             'duracion_min' => 'required|integer|min:5',
-            'descripcion' => 'nullable|string'
+            'descripcion' => 'nullable|string',
+            'especialistas' => 'nullable|array',
+            'especialistas.*' => 'exists:users,id',
+            'precios_especialistas' => 'nullable|array',
+            'precios_especialistas.*' => 'nullable|numeric|min:0',
         ]);
 
-        $servicio->update($validated);
+        $servicio->update([
+            'nombre' => $validated['nombre'],
+            'categoria' => $validated['categoria'],
+            'precio_base' => $validated['precio_base'],
+            'duracion_min' => $validated['duracion_min'],
+            'descripcion' => $validated['descripcion'] ?? null,
+        ]);
+
+        $syncData = [];
+        foreach ($request->input('especialistas', []) as $especialistaId) {
+            $syncData[(int) $especialistaId] = [
+                'precio_especialista' => (float) ($request->input('precios_especialistas.' . $especialistaId, $validated['precio_base'])),
+            ];
+        }
+
+        $servicio->especialistas()->sync($syncData);
 
         return redirect()->back()->with('success', 'Servicio actualizado correctamente.');
     }

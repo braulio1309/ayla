@@ -50,9 +50,8 @@
         </form>
       </div>
 
-      <!-- Tarjetas KPI (3 Tarjetas en Fila) -->
+      <!-- Tarjetas KPI -->
       <div class="row g-3 mb-4">
-        <!-- KPI 1: Ingresos Brutos Auditados -->
         <div class="col-md-4">
           <div class="card-ayla p-4 bg-ayla-dark text-white h-100">
             <span class="small text-white-50 d-block mb-1">Ingresos Brutos Auditados</span>
@@ -61,21 +60,19 @@
           </div>
         </div>
 
-        <!-- KPI 2: Total Citas Asistidas -->
         <div class="col-md-4">
           <div class="card-ayla p-4 bg-ayla-cream text-ayla-dark h-100">
-            <span class="small text-muted d-block mb-1">Total de Citas Asistidas</span>
-            <h2 class="brand-font fw-bold mb-1">{{ kpis.total_citas }} Citas</h2>
-            <span class="small text-muted">Promedio: ${{ kpis.promedio_cita.toFixed(2) }} / cita</span>
+            <span class="small text-muted d-block mb-1">Comisión Especialistas</span>
+            <h2 class="brand-font fw-bold mb-1">${{ kpis.total_comision_especialistas.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}</h2>
+            <span class="small text-muted">Total pagado a profesionales</span>
           </div>
         </div>
 
-        <!-- KPI 3: Trabajador con Mayor Producción -->
         <div class="col-md-4">
           <div class="card-ayla p-4 bg-ayla-rose text-white h-100">
-            <span class="small text-white-50 d-block mb-1">Trabajador con Mayor Producción</span>
-            <h2 class="brand-font fw-bold mb-1">{{ kpis.top_especialista }}</h2>
-            <span class="small text-white-50">Generó ${{ kpis.top_especialista_monto.toFixed(2) }} ({{ kpis.top_especialista_porcentaje }}%)</span>
+            <span class="small text-white-50 d-block mb-1">Ganancia del Negocio</span>
+            <h2 class="brand-font fw-bold mb-1">${{ kpis.total_negocio.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}</h2>
+            <span class="small text-white-50">Monto restante después de comisiones</span>
           </div>
         </div>
       </div>
@@ -90,7 +87,9 @@
                 <th>Especialista</th>
                 <th>Categoría Principal</th>
                 <th>Citas Completadas</th>
-                <th>Ingreso Generado</th>
+                <th>Generado por especialista</th>
+                <th>Comisión del especialista</th>
+                <th>Restante para el negocio</th>
                 <th>% Aporte Negocio</th>
               </tr>
             </thead>
@@ -100,6 +99,8 @@
                 <td>{{ item.categoria }}</td>
                 <td>{{ item.citas_completadas }}</td>
                 <td class="fw-bold text-success">${{ item.ingreso_generado.toFixed(2) }}</td>
+                <td class="fw-bold text-ayla-dark">${{ item.comision_especialista.toFixed(2) }}</td>
+                <td class="fw-bold text-primary">${{ item.ganancia_negocio.toFixed(2) }}</td>
                 <td>{{ item.aporte_porcentaje }}</td>
               </tr>
             </tbody>

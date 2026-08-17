@@ -123,21 +123,22 @@
                 <h6 class="fw-bold text-ayla-dark mb-0">{{ nombreMes }} {{ anioCalendario }}</h6>
                 <button class="btn btn-outline-secondary btn-sm" @click="cambiarMes(1)"><i class="bi bi-chevron-right"></i></button>
               </div>
-              <div class="row text-center small text-muted fw-bold mb-2">
-                <div class="col">Do</div>
+              <div class="calendar-weekdays text-center small text-muted fw-bold mb-2">
                 <div class="col">Lu</div>
                 <div class="col">Ma</div>
                 <div class="col">Mi</div>
                 <div class="col">Ju</div>
                 <div class="col">Vi</div>
                 <div class="col">Sa</div>
+                <div class="col">Do</div>
               </div>
-              <div class="row g-2">
-                <div v-for="(dia, index) in diasCalendario" :key="index" class="col-12 col-sm-6 col-md-4 col-lg-2">
-                  <button class="w-100 border rounded py-3 text-start position-relative" :class="{
+              <div class="calendar-grid">
+                <div v-for="(dia, index) in diasCalendario" :key="index" class="calendar-day">
+                  <button class="w-100 border rounded p-2 text-start position-relative h-100" :class="{
                     'bg-ayla-cream': dia.activo,
                     'border-ayla-rose': dia.fecha === fechaCalendario,
-                    'text-muted': !dia.enMes
+                    'text-muted': !dia.enMes,
+                    'bg-light': !dia.activo && dia.enMes
                   }" @click="seleccionarDia(dia)">
                     <div class="fw-bold">{{ dia.dia }}</div>
                     <div v-if="dia.citas > 0" class="small text-ayla-dark">{{ dia.citas }} cita(s)</div>
@@ -208,7 +209,7 @@
                     <span>Servicios a Realizar (Acumulables)</span>
                     <span class="text-muted small">Seleccione uno o varios</span>
                   </label>
-                  <div class="card p-3 bg-light border">
+                  <div v-if="serviciosState.length" class="card p-3 bg-light border">
                     <div v-for="s in serviciosState" :key="s.id" class="form-check mb-2">
                       <input class="form-check-input" type="checkbox" :id="'srv-agenda-'+s.id" v-model="s.selected">
                       <label class="form-check-label d-flex justify-content-between w-100" :for="'srv-agenda-'+s.id">
@@ -216,6 +217,9 @@
                         <strong class="text-ayla-dark">${{ s.precio.toFixed(2) }}</strong>
                       </label>
                     </div>
+                  </div>
+                  <div v-else class="alert alert-warning small mb-0">
+                    Selecciona un especialista para cargar sus servicios disponibles.
                   </div>
                 </div>
 
@@ -238,6 +242,37 @@
                   </select>
                 </div>
 
+                <div class="col-12">
+                  <label class="form-label fw-medium">Recurrencia del turno</label>
+                  <select class="form-select" v-model="formTurno.recurrencia">
+                    <option value="ninguna">Sin recurrencia</option>
+                    <option value="semanal">Cada semana</option>
+                    <option value="quincenal">Quincenal (cada 2 semanas)</option>
+                    <option value="mensual">Mensual</option>
+                  </select>
+                </div>
+
+                <div v-if="formTurno.recurrencia !== 'ninguna'" class="col-12">
+                  <div class="border rounded p-3 bg-light">
+                    <label class="form-label fw-medium">Días de la semana</label>
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                      <label v-for="dia in diasSemanaOptions" :key="dia.value" class="btn btn-sm border rounded-pill px-3" :class="{
+                        'btn-ayla-primary text-white': formTurno.dias_semana.includes(dia.value),
+                        'btn-outline-secondary': !formTurno.dias_semana.includes(dia.value)
+                      }">
+                        <input type="checkbox" class="form-check-input me-2" :value="dia.value" v-model="formTurno.dias_semana">{{ dia.label }}
+                      </label>
+                    </div>
+
+                    <div v-if="formTurno.recurrencia === 'mensual'" class="small text-muted mb-2">
+                      La serie mensual se repite en la misma fecha del mes desde la fecha de inicio.
+                    </div>
+
+                    <label class="form-label fw-medium">Número de sesiones</label>
+                    <input type="number" min="1" max="60" class="form-control" v-model.number="formTurno.cantidad_sesiones">
+                  </div>
+                </div>
+
                 <!-- Resumen Automático -->
                 <div class="col-12 mt-3 p-3 bg-ayla-cream rounded d-flex justify-content-between align-items-center">
                   <div>
@@ -245,7 +280,9 @@
                     <strong class="fs-5 text-ayla-dark">{{ duracionTotal }} min</strong>
                   </div>
                   <div class="text-end">
-                    <span class="text-muted small d-block">Monto Económico Total:</span>
+                      <span class="text-muted small d-block">Monto por sesión:</span>
+                      <strong class="fs-6 text-ayla-dark">${{ precioSesion.toFixed(2) }}</strong>
+                      <span class="text-muted small d-block mt-1">Total a pagar por {{ sesionesSeleccionadas }} sesión{{ sesionesSeleccionadas === 1 ? '' : 'es' }}:</span>
                     <strong class="fs-4 text-ayla-dark">${{ precioTotal.toFixed(2) }}</strong>
                   </div>
                 </div>
@@ -304,13 +341,28 @@
               </li>
             </ul>
 
+            <div class="border rounded p-3 bg-light mb-3">
+              <label class="form-label fw-medium">Estado del turno</label>
+              <select class="form-select mb-3" v-model="estadoForm.estado">
+                <option value="Confirmado">Confirmado</option>
+                <option value="En Proceso">En Proceso</option>
+                <option value="Completado">Completado</option>
+              </select>
+
+              <label class="form-label fw-medium">Nota clínica / observaciones</label>
+              <textarea class="form-control" rows="4" v-model="estadoForm.observaciones" placeholder="Escribe la evolución del paciente, tratamiento realizado o recomendaciones."></textarea>
+            </div>
+
             <div class="p-3 bg-light rounded small mb-3" v-if="citaSeleccionada.observaciones">
               <strong>Observaciones:</strong> {{ citaSeleccionada.observaciones }}
             </div>
           </div>
           <div class="modal-footer border-top d-flex justify-content-between">
             <button type="button" class="btn btn-outline-danger btn-sm">Cancelar Cita</button>
-            <button type="button" class="btn btn-ayla-primary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+            <button type="button" class="btn btn-ayla-primary btn-sm" @click="guardarEstadoTurno" :disabled="estadoForm.processing">
+              {{ estadoForm.processing ? 'Guardando...' : 'Guardar cambios' }}
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
           </div>
         </div>
       </div>
@@ -322,7 +374,7 @@
 <script setup>
 import MainLayout from '../Layouts/MainLayout.vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 
 const props = defineProps({
   filters: Object,
@@ -333,10 +385,18 @@ const props = defineProps({
   especialistas_lista: Array
 });
 
+const localDateKey = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const vistaActual = ref('lista');
-const fechaCalendario = ref(props.filters?.fecha || new Date().toISOString().substr(0, 10));
-const mesCalendario = ref(new Date().getMonth());
-const anioCalendario = ref(new Date().getFullYear());
+const fechaCalendario = ref(props.filters?.fecha || localDateKey(new Date()));
+const fechaInicial = new Date(`${fechaCalendario.value}T00:00:00`);
+const mesCalendario = ref(fechaInicial.getMonth());
+const anioCalendario = ref(fechaInicial.getFullYear());
 
 const nombreMes = computed(() => {
   return new Date(anioCalendario.value, mesCalendario.value, 1).toLocaleDateString('es-ES', { month: 'long' });
@@ -346,18 +406,43 @@ const diasCalendario = computed(() => {
   const primerDia = new Date(anioCalendario.value, mesCalendario.value, 1);
   const ultimoDia = new Date(anioCalendario.value, mesCalendario.value + 1, 0);
   const dias = [];
-  const inicioSemana = (primerDia.getDay() + 6) % 7;
 
-  for (let i = 0; i < inicioSemana; i++) {
-    const fecha = new Date(anioCalendario.value, mesCalendario.value, i - inicioSemana + 1);
-    dias.push({ dia: fecha.getDate(), fecha: fecha.toISOString().slice(0, 10), enMes: false, citas: 0, activo: false });
+  // La cabecera comienza en lunes; convertimos domingo (0) en la última columna.
+  const primerDiaSemana = (primerDia.getDay() + 6) % 7;
+
+  for (let i = primerDiaSemana; i > 0; i--) {
+    const fecha = new Date(anioCalendario.value, mesCalendario.value, 1 - i);
+    dias.push({
+      dia: fecha.getDate(),
+      fecha: localDateKey(fecha),
+      enMes: false,
+      citas: 0,
+      activo: false,
+    });
   }
 
   for (let dia = 1; dia <= ultimoDia.getDate(); dia++) {
     const fecha = new Date(anioCalendario.value, mesCalendario.value, dia);
-    const key = fecha.toISOString().slice(0, 10);
-    const citas = props.calendario?.[key] || 0;
-    dias.push({ dia, fecha: key, enMes: true, citas, activo: key === fechaCalendario.value });
+    const key = localDateKey(fecha);
+    dias.push({
+      dia,
+      fecha: key,
+      enMes: true,
+      citas: props.calendario?.[key] || 0,
+      activo: key === fechaCalendario.value,
+    });
+  }
+
+  const totalCeldas = Math.ceil(dias.length / 7) * 7;
+  while (dias.length < totalCeldas) {
+    const fecha = new Date(anioCalendario.value, mesCalendario.value, dias.length - primerDiaSemana + 1);
+    dias.push({
+      dia: fecha.getDate(),
+      fecha: localDateKey(fecha),
+      enMes: false,
+      citas: 0,
+      activo: false,
+    });
   }
 
   return dias;
@@ -368,10 +453,7 @@ const turnosDelDiaSeleccionado = computed(() => {
     return [];
   }
 
-  return props.turnos.filter((turno) => {
-    const fechaTurno = props.filters?.fecha || fechaCalendario.value;
-    return turno.hora_inicio && turno.hora_inicio.includes(':') && fechaTurno === fechaCalendario.value;
-  });
+  return (props.turnos || []).filter((turno) => turno.hora_inicio && turno.hora_inicio.includes(':'));
 });
 
 const cambiarMes = (delta) => {
@@ -379,13 +461,15 @@ const cambiarMes = (delta) => {
   mesCalendario.value = nuevaFecha.getMonth();
   anioCalendario.value = nuevaFecha.getFullYear();
 
-  const fechaMes = `${nuevaFecha.getFullYear()}-${String(nuevaFecha.getMonth() + 1).padStart(2, '0')}-01`;
+  const fechaMes = localDateKey(new Date(nuevaFecha.getFullYear(), nuevaFecha.getMonth(), 1));
   filterForm.value.fecha = fechaMes;
   router.get('/agenda', { ...filterForm.value, fecha: fechaMes }, { preserveState: true });
 };
 
 const seleccionarDia = (dia) => {
   fechaCalendario.value = dia.fecha;
+  mesCalendario.value = new Date(`${dia.fecha}T00:00:00`).getMonth();
+  anioCalendario.value = new Date(`${dia.fecha}T00:00:00`).getFullYear();
   filterForm.value.fecha = dia.fecha;
   router.get('/agenda', { ...filterForm.value, fecha: dia.fecha }, { preserveState: true });
 };
@@ -397,7 +481,7 @@ const disponibilidadMensaje = computed(() => page.props.errors?.disponibilidad |
 
 // Formulario reactivo para los Filtros de búsqueda
 const filterForm = ref({
-  fecha: props.filters.fecha || new Date().toISOString().substr(0, 10),
+  fecha: props.filters.fecha || localDateKey(new Date()),
   especialista_id: isSpecialist.value ? (authUser.value?.id || '') : (props.filters.especialista_id || ''),
   estado: props.filters.estado || ''
 });
@@ -413,7 +497,7 @@ const aplicarFiltros = () => {
 
 const limpiarFiltros = () => {
   filterForm.value = {
-    fecha: new Date().toISOString().substr(0, 10),
+    fecha: localDateKey(new Date()),
     especialista_id: isSpecialist.value ? (authUser.value?.id || '') : '',
     estado: ''
   };
@@ -422,27 +506,86 @@ const limpiarFiltros = () => {
 
 // Cita seleccionada para modal de detalle
 const citaSeleccionada = ref(null);
+const estadoForm = useForm({
+  estado: 'Confirmado',
+  observaciones: ''
+});
+
 const verDetalle = (cita) => {
   citaSeleccionada.value = cita;
+  estadoForm.estado = cita.estado || 'Confirmado';
+  estadoForm.observaciones = cita.observaciones || '';
 };
 
-// Manejo del estado de selección múltiple de servicios
-const serviciosState = ref(
-  props.servicios_lista.map((s, index) => ({
-    ...s,
-    selected: index === 0
-  }))
-);
+const guardarEstadoTurno = () => {
+  if (!citaSeleccionada.value) return;
+
+  estadoForm.put('/agenda/' + citaSeleccionada.value.id, {
+    preserveScroll: true,
+    onSuccess: () => {
+      const modalEl = document.getElementById('modalDetalleCita');
+      const modal = bootstrap.Modal.getInstance(modalEl);
+      if (modal) modal.hide();
+      estadoForm.reset();
+      router.get('/agenda', {
+        ...filterForm.value,
+        fecha: filterForm.value.fecha || new Date().toISOString().substr(0, 10)
+      }, { preserveState: true });
+    }
+  });
+};
 
 // Formulario de Asignación de Turno (Inertia)
+const diasSemanaOptions = [
+  { label: 'Lun', value: 0 },
+  { label: 'Mar', value: 1 },
+  { label: 'Mié', value: 2 },
+  { label: 'Jue', value: 3 },
+  { label: 'Vie', value: 4 },
+  { label: 'Sáb', value: 5 },
+  { label: 'Dom', value: 6 }
+];
+
 const formTurno = useForm({
   paciente_id: '',
   especialista_id: isSpecialist.value ? (authUser.value?.id || '') : '',
   servicios: [],
   fecha: props.filters.fecha || new Date().toISOString().substr(0, 10),
   hora_inicio: '08:00',
-  holgura_min: 15
+  holgura_min: 15,
+  recurrencia: 'ninguna',
+  dias_semana: [],
+  cantidad_sesiones: 1
 });
+
+const serviciosDisponibles = computed(() => {
+  const especialistaId = Number(formTurno.especialista_id || 0);
+
+  if (!especialistaId) {
+    return props.servicios_lista;
+  }
+
+  return props.servicios_lista.filter((servicio) => {
+    if (!Array.isArray(servicio.especialistas) || servicio.especialistas.length === 0) {
+      return false;
+    }
+
+    return servicio.especialistas.some((especialista) => Number(especialista.id) === especialistaId);
+  });
+});
+
+const serviciosState = ref([]);
+
+watch(
+  () => formTurno.especialista_id,
+  () => {
+    serviciosState.value = serviciosDisponibles.value.map((servicio) => ({
+      ...servicio,
+      selected: false,
+    }));
+  },
+  { immediate: true }
+);
 
 // Cálculos reactivos de tiempo y costo
 const duracionTotal = computed(() => {
@@ -451,7 +594,17 @@ const duracionTotal = computed(() => {
 });
 
 const precioTotal = computed(() => {
+  return precioSesion.value * sesionesSeleccionadas.value;
+});
+
+const precioSesion = computed(() => {
   return serviciosState.value.filter(s => s.selected).reduce((acc, s) => acc + s.precio, 0);
+});
+
+const sesionesSeleccionadas = computed(() => {
+  return formTurno.recurrencia === 'ninguna'
+    ? 1
+    : Math.max(1, Number(formTurno.cantidad_sesiones) || 1);
 });
 
 const estadoClass = (estado) => {
@@ -475,12 +628,25 @@ const resetServicios = () => {
 
 const guardarTurno = () => {
   formTurno.servicios = serviciosState.value.filter(s => s.selected).map(s => s.id);
+  if (formTurno.recurrencia === 'ninguna') {
+    formTurno.dias_semana = [];
+    formTurno.cantidad_sesiones = 1;
+  }
+
+  if (formTurno.recurrencia !== 'ninguna' && formTurno.dias_semana.length === 0) {
+    const fechaInicio = new Date(formTurno.fecha);
+    const dayIndex = (fechaInicio.getDay() + 6) % 7;
+    formTurno.dias_semana = [dayIndex];
+  }
+
   formTurno.post('/agenda', {
     onSuccess: () => {
       const modalEl = document.getElementById('modalNuevoTurno');
       const modal = bootstrap.Modal.getInstance(modalEl);
       if (modal) modal.hide();
-      formTurno.reset();
+      formTurno.reset();      formTurno.fecha = localDateKey(new Date());      formTurno.recurrencia = 'ninguna';
+      formTurno.dias_semana = [];
+      formTurno.cantidad_sesiones = 1;
       resetServicios();
     }
   });
@@ -493,6 +659,39 @@ const guardarTurno = () => {
   background-color: rgba(229, 218, 196, 0.25);
   border-radius: 8px;
   padding: 10px;
+}
+
+.calendar-weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.calendar-day {
+  min-width: 0;
+  min-height: 84px;
+}
+
+.calendar-day button {
+  min-height: 84px;
+}
+
+@media (max-width: 576px) {
+  .calendar-weekdays,
+  .calendar-grid {
+    gap: 0.25rem;
+  }
+
+  .calendar-day,
+  .calendar-day button {
+    min-height: 68px;
+  }
+
+  .calendar-day button {
+    font-size: 0.8rem;
+    padding: 0.4rem !important;
+  }
 }
 .turno-card.completado {
   border-left-color: #5b8c5a;

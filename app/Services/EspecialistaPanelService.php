@@ -21,7 +21,10 @@ class EspecialistaPanelService
             ->orderBy('fecha', 'desc')
             ->get();
 
-        $comisionTotal = (float) $citas->sum('monto_total');
+        $totalGenerado = (float) $citas->sum('monto_total');
+        $porcentajeComision = $usuario && $usuario->role === 'especialista' ? (float) ($usuario->comision ?? 0) : 0;
+        $comisionTotal = round($totalGenerado * ($porcentajeComision / 100), 2);
+        $negocioTotal = round($totalGenerado - $comisionTotal, 2);
 
         $nombreEspecialista = $usuario ? $usuario->name : 'Especialista';
         $especialidad = ($usuario && $usuario->role === 'especialista') ? 'Especialista' : 'Administrador';
@@ -30,8 +33,11 @@ class EspecialistaPanelService
             'especialista' => [
                 'nombre' => $nombreEspecialista,
                 'especialidad' => $especialidad,
+                'comision' => $porcentajeComision,
             ],
+            'total_generado' => $totalGenerado,
             'comision_total' => $comisionTotal,
+            'negocio_total' => $negocioTotal,
             'filters' => [
                 'fecha_inicio' => $fechaInicio,
                 'fecha_fin' => $fechaFin,

@@ -53,6 +53,15 @@
             
             <h5 class="fw-bold text-ayla-dark mt-1">{{ s.nombre }}</h5>
             <p class="text-muted small flex-grow-1">{{ s.descripcion || 'Sin descripción detallada.' }}</p>
+
+            <div v-if="s.especialistas && s.especialistas.length" class="small text-muted mb-2">
+              <strong>Especialistas:</strong>
+              <div class="mt-1">
+                <span v-for="(es, index) in s.especialistas" :key="es.id" class="badge bg-light text-dark border me-1 mb-1">
+                  {{ es.name }} (${{ es.precio_especialista.toFixed(2) }})
+                </span>
+              </div>
+            </div>
             
             <div class="border-top pt-3 d-flex justify-content-between align-items-center mt-auto">
               <span class="small text-muted fw-medium">
@@ -120,6 +129,31 @@
                 </div>
 
                 <div class="col-12">
+                  <label class="form-label fw-medium">Especialistas que lo realizan</label>
+                  <div class="border rounded p-3 bg-light">
+                    <div v-for="especialista in especialistas_lista" :key="especialista.id" class="mb-3">
+                      <div class="d-flex justify-content-between align-items-center gap-2">
+                        <label class="form-check-label d-flex align-items-center gap-2 mb-0">
+                          <input class="form-check-input" type="checkbox" :value="especialista.id" v-model="formServicio.especialistas">
+                          <span>{{ especialista.name }}</span>
+                        </label>
+                        <span v-if="formServicio.especialistas.includes(especialista.id)" class="small text-muted">Precio</span>
+                      </div>
+                      <input
+                        v-if="formServicio.especialistas.includes(especialista.id)"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        class="form-control mt-2"
+                        :value="formServicio.precios_especialistas[especialista.id] ?? formServicio.precio_base"
+                        @input="formServicio.precios_especialistas[especialista.id] = Number($event.target.value) || 0"
+                        :placeholder="`Precio para ${especialista.name}`"
+                      >
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-12">
                   <label class="form-label fw-medium">Descripción</label>
                   <textarea class="form-control" rows="3" v-model="formServicio.descripcion" placeholder="Detalles sobre lo que incluye este servicio o técnica aplicada..."></textarea>
                 </div>
@@ -142,13 +176,16 @@
 <script setup>
 import MainLayout from '../Layouts/MainLayout.vue';
 import { router, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 
 const props = defineProps({
   filters: Object,
   servicios: Array,
-  categorias: Array
+  categorias: Array,
+  especialistas: Array
 });
+
+const especialistas_lista = computed(() => props.especialistas || []);
 
 // Filtros Reactivos
 const searchQuery = ref(props.filters.search || '');
@@ -179,13 +216,17 @@ const formServicio = useForm({
   categoria: '',
   precio_base: '',
   duracion_min: '',
-  descripcion: ''
+  descripcion: '',
+  especialistas: [],
+  precios_especialistas: {}
 });
 
 const abrirModalCrear = () => {
   modoEdicion.value = false;
   servicioIdActual.value = null;
   formServicio.reset();
+  formServicio.especialistas = [];
+  formServicio.precios_especialistas = {};
   formServicio.clearErrors();
 };
 
@@ -198,15 +239,28 @@ const abrirModalEditar = (servicio) => {
   formServicio.precio_base = servicio.precio_base;
   formServicio.duracion_min = servicio.duracion_min;
   formServicio.descripcion = servicio.descripcion;
+  formServicio.especialistas = (servicio.especialistas || []).map((especialista) => especialista.id);
+  formServicio.precios_especialistas = {};
+  (servicio.especialistas || []).forEach((especialista) => {
+    formServicio.precios_especialistas[especialista.id] = especialista.precio_especialista;
+  });
 };
 
 const guardarServicio = () => {
+  const payload = {
+    ...formServicio,
+    especialistas: formServicio.especialistas,
+    precios_especialistas: formServicio.precios_especialistas,
+  };
+
   if (modoEdicion.value) {
     formServicio.put(`/servicios/${servicioIdActual.value}`, {
+      data: payload,
       onSuccess: () => cerrarModal()
     });
   } else {
     formServicio.post('/servicios', {
+      data: payload,
       onSuccess: () => cerrarModal()
     });
   }
@@ -217,6 +271,8 @@ const cerrarModal = () => {
   const modal = bootstrap.Modal.getInstance(modalEl);
   if (modal) modal.hide();
   formServicio.reset();
+  formServicio.especialistas = [];
+  formServicio.precios_especialistas = {};
 };
 
 const obtenerBadgeCategoria = (categoria) => {

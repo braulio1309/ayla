@@ -47,6 +47,7 @@ class UsuarioController extends Controller
                 'email' => $u->email,
                 'role' => $u->role ?? 'especialista',
                 'is_active' => (bool)($u->is_active ?? true),
+                'comision' => (float)($u->comision ?? 0),
             ];
         });
 
@@ -74,10 +75,12 @@ class UsuarioController extends Controller
             'email' => 'required|email|max:255|unique:users,email',
             'password' => 'required|string|min:8',
             'role' => 'required|string|in:admin,especialista',
-            'is_active' => 'required|boolean'
+            'is_active' => 'required|boolean',
+            'comision' => 'nullable|numeric|min:0|max:100',
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
+        $validated['comision'] = isset($validated['comision']) ? (float) $validated['comision'] : 0;
 
         User::create($validated);
 
@@ -94,7 +97,8 @@ class UsuarioController extends Controller
             'email' => ['required', 'email', 'max:255', Rule::unique('users')->ignore($usuario->id)],
             'password' => 'nullable|string|min:8',
             'role' => 'required|string|in:admin,especialista',
-            'is_active' => 'required|boolean'
+            'is_active' => 'required|boolean',
+            'comision' => 'nullable|numeric|min:0|max:100',
         ]);
 
         if (!empty($validated['password'])) {
@@ -102,6 +106,8 @@ class UsuarioController extends Controller
         } else {
             unset($validated['password']);
         }
+
+        $validated['comision'] = isset($validated['comision']) ? (float) $validated['comision'] : 0;
 
         $usuario->update($validated);
 
@@ -120,9 +126,11 @@ class UsuarioController extends Controller
 
         return Inertia::render('PanelEspecialista', [
             'especialista' => $data['especialista'],
-            'comision_total' => $data['comision_total'],
+            'total_generado' => $data['total_generado'] ?? 0,
+            'comision_total' => $data['comision_total'] ?? 0,
+            'negocio_total' => $data['negocio_total'] ?? 0,
             'filters' => $data['filters'],
-            'atenciones' => $data['atenciones'],
+            'atenciones' => $data['atenciones'] ?? [],
         ]);
     }
 }
