@@ -44,6 +44,7 @@ class AgendaService
                 'duracion_min' => $duracion > 0 ? $duracion : (int) ($cita->holgura_min ?? 0),
                 'paciente' => ($cita->paciente ? $cita->paciente->nombre : null) ?? 'Sin paciente',
                 'paciente_id' => $cita->paciente_id,
+                'servicio_ids' => $cita->servicios->pluck('id')->values()->all(),
                 'servicio' => $cita->servicios->pluck('nombre')->join(', ') ?: 'Sin servicio',
                 'especialista' => ($cita->especialista ? $cita->especialista->name : null) ?? 'Sin especialista',
                 'especialista_id' => $cita->user_id,

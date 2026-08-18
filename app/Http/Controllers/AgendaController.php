@@ -163,6 +163,59 @@ class AgendaController extends Controller
             abort(403, 'No tienes permisos para actualizar este turno.');
         }
 
+        if ($request->hasAny(['paciente_id', 'especialista_id', 'servicios', 'fecha', 'hora_inicio', 'holgura_min'])) {
+            abort_unless($user->role === 'admin', 403, 'Solo los administradores pueden modificar los datos de la cita.');
+
+            $validated = $request->validate([
+                'paciente_id' => 'required|exists:pacientes,id',
+                'especialista_id' => 'required|exists:users,id',
+                'servicios' => 'required|array|min:1',
+                'servicios.*' => 'integer|exists:servicios,id',
+                'fecha' => 'required|date',
+                'hora_inicio' => 'required|date_format:H:i',
+                'holgura_min' => 'required|integer|min:0',
+            ]);
+
+            $servicios = Servicio::whereIn('id', $validated['servicios'])->get();
+            $duracionTotal = $servicios->sum(fn ($servicio) => (int) ($servicio->duracion_min ?? 0));
+            $conflicto = $this->buscarConflicto(
+                $validated['paciente_id'],
+                $validated['especialista_id'],
+                $validated['fecha'],
+                $validated['hora_inicio'],
+                $validated['holgura_min'],
+                $duracionTotal,
+                $cita->id
+            );
+
+            if ($conflicto) {
+                return redirect()->back()->withErrors(['disponibilidad' => 'No se puede modificar porque ' . $conflicto])->withInput();
+            }
+
+            $horaInicio = Carbon::parse($validated['fecha'] . ' ' . $validated['hora_inicio']);
+            $cita->update([
+                'paciente_id' => $validated['paciente_id'],
+                'user_id' => $validated['especialista_id'],
+                'fecha' => $validated['fecha'],
+                'hora_inicio' => $horaInicio->format('H:i:s'),
+                'hora_fin' => $horaInicio->copy()->addMinutes($duracionTotal + $validated['holgura_min'])->format('H:i:s'),
+                'holgura_min' => $validated['holgura_min'],
+                'monto_total' => $servicios->sum(fn ($servicio) => (float) $servicio->getPrecioParaEspecialista((int) $validated['especialista_id'])),
+            ]);
+
+            $cita->servicios()->sync($servicios->mapWithKeys(fn ($servicio) => [
+                $servicio->id => [
+                    'precio_momento' => (float) $servicio->getPrecioParaEspecialista((int) $validated['especialista_id']),
+                    'duracion_momento' => (int) ($servicio->duracion_min ?? 0),
+                ],
+            ])->all());
+
+            return redirect()->route('agenda.index', [
+                'fecha' => $validated['fecha'],
+                'especialista_id' => $validated['especialista_id'],
+            ])->with('success', 'Cita modificada correctamente.');
+        }
+
         $validated = $request->validate([
             'estado' => 'required|string|in:Confirmado,En Proceso,Completado,Cancelado',
             'observaciones' => 'nullable|string|max:1000',
@@ -244,7 +297,7 @@ class AgendaController extends Controller
         return array_slice($fechas, 0, $cantidadSesiones);
     }
 
-    private function buscarConflicto($pacienteId, $especialistaId, $fecha, $horaInicio, $holguraMin, $duracionTotal)
+    private function buscarConflicto($pacienteId, $especialistaId, $fecha, $horaInicio, $holguraMin, $duracionTotal, ?int $excluirCitaId = null)
     {
         $horaInicioDate = Carbon::createFromFormat('H:i', $horaInicio);
         $horaFinDate = $horaInicioDate->copy()->addMinutes($duracionTotal + (int) $holguraMin);
@@ -257,6 +310,10 @@ class AgendaController extends Controller
             ->get();
 
         foreach ($citas as $cita) {
+            if ($excluirCitaId && $cita->id === $excluirCitaId) {
+                continue;
+            }
+
             $citaInicio = Carbon::parse($cita->hora_inicio);
             $citaFin = Carbon::parse($cita->hora_fin ?? $citaInicio->copy()->addMinutes((int) ($cita->holgura_min ?? 0)));
 

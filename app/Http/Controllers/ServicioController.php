@@ -7,6 +7,7 @@ use Inertia\Inertia;
 use Illuminate\Http\Request;
 use App\Models\Servicio;
 use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 
 class ServicioController extends Controller
 {
@@ -34,6 +35,8 @@ class ServicioController extends Controller
 
     public function store(Request $request)
     {
+        abort_unless(Auth::check() && Auth::user()->role === 'admin', 403);
+
         $validated = $request->validate([
             'nombre' => 'required|string|max:255',
             'categoria' => 'required|string|max:100',
@@ -70,6 +73,8 @@ class ServicioController extends Controller
 
     public function update(Request $request, Servicio $servicio)
     {
+        abort_unless(Auth::check() && Auth::user()->role === 'admin', 403);
+
         $validated = $request->validate([
             'nombre' => 'required|string|max:255',
             'categoria' => 'required|string|max:100',

@@ -94,9 +94,14 @@
                     <div class="small text-muted mt-1">Cabina: {{ turno.cabina }}</div>
                     <div class="mt-2 d-flex justify-content-between align-items-center">
                       <span class="badge" :class="estadoBadgeClass(turno.estado)">{{ turno.estado }}</span>
-                      <button class="btn btn-sm btn-light border py-0 px-2" @click="verDetalle(turno)" data-bs-toggle="modal" data-bs-target="#modalDetalleCita">
-                        Ver detalle
-                      </button>
+                      <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-light border py-0 px-2" @click="verDetalle(turno)" data-bs-toggle="modal" data-bs-target="#modalDetalleCita">
+                          Ver detalle
+                        </button>
+                        <button v-if="isAdmin" class="btn btn-sm btn-ayla-outline py-0 px-2" @click="abrirEdicionCita(turno)" data-bs-toggle="modal" data-bs-target="#modalEditarCita">
+                          <i class="bi bi-pencil"></i> Modificar
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </td>
@@ -161,6 +166,9 @@
                   </div>
                   <div class="small text-muted mt-1">{{ turno.hora_inicio }} - {{ turno.hora_fin }}</div>
                   <div class="small text-ayla-dark">{{ turno.servicio }}</div>
+                  <button v-if="isAdmin" class="btn btn-sm btn-ayla-outline mt-2" @click="abrirEdicionCita(turno)" data-bs-toggle="modal" data-bs-target="#modalEditarCita">
+                    <i class="bi bi-pencil me-1"></i> Modificar cita
+                  </button>
                 </div>
               </div>
             </div>
@@ -368,6 +376,73 @@
       </div>
     </div>
 
+    <div class="modal fade" id="modalEditarCita" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content card-ayla border-0" v-if="citaSeleccionada">
+          <div class="modal-header bg-ayla-cream">
+            <h5 class="modal-title brand-font fw-bold"><i class="bi bi-pencil-square me-2"></i>Modificar Cita #AY-{{ citaSeleccionada.id }}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <form @submit.prevent="guardarEdicionCita">
+            <div class="modal-body p-4">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label fw-medium">Paciente</label>
+                  <select class="form-select" v-model="citaEditForm.paciente_id" required>
+                    <option value="">Seleccionar paciente...</option>
+                    <option v-for="paciente in pacientes_lista" :key="paciente.id" :value="paciente.id">{{ paciente.nombre }} ({{ paciente.cedula }})</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-medium">Especialista</label>
+                  <select class="form-select" v-model="citaEditForm.especialista_id" required>
+                    <option value="">Seleccionar especialista...</option>
+                    <option v-for="especialista in especialistas_lista" :key="especialista.id" :value="especialista.id">{{ especialista.name }}</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label fw-medium">Fecha</label>
+                  <input type="date" class="form-control" v-model="citaEditForm.fecha" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label fw-medium">Hora de inicio</label>
+                  <input type="time" class="form-control" v-model="citaEditForm.hora_inicio" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label fw-medium">Holgura</label>
+                  <select class="form-select" v-model="citaEditForm.holgura_min">
+                    <option :value="10">10 minutos</option>
+                    <option :value="15">15 minutos</option>
+                    <option :value="20">20 minutos</option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-medium">Servicios</label>
+                  <div class="border rounded p-3 bg-light">
+                    <div v-for="servicio in serviciosEdicion" :key="servicio.id" class="form-check mb-2">
+                      <input class="form-check-input" type="checkbox" :id="'srv-edit-'+servicio.id" :value="servicio.id" v-model="citaEditForm.servicios">
+                      <label class="form-check-label d-flex justify-content-between w-100" :for="'srv-edit-'+servicio.id">
+                        <span>{{ servicio.nombre }} ({{ servicio.duracion }} min)</span>
+                        <strong>${{ servicio.precio.toFixed(2) }}</strong>
+                      </label>
+                    </div>
+                    <span v-if="!serviciosEdicion.length" class="text-muted small">No hay servicios asignados a este especialista.</span>
+                  </div>
+                </div>
+                <div v-if="disponibilidadMensaje" class="col-12">
+                  <div class="alert alert-warning mb-0 py-2 px-3 small">{{ disponibilidadMensaje }}</div>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer border-top">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+              <button type="submit" class="btn btn-ayla-primary" :disabled="citaEditForm.processing">Guardar cambios</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
   </MainLayout>
 </template>
 
@@ -477,6 +552,7 @@ const seleccionarDia = (dia) => {
 const page = usePage();
 const authUser = computed(() => page.props.auth?.user || null);
 const isSpecialist = computed(() => authUser.value?.role === 'especialista');
+const isAdmin = computed(() => authUser.value?.role === 'admin');
 const disponibilidadMensaje = computed(() => page.props.errors?.disponibilidad || '');
 
 // Formulario reactivo para los Filtros de búsqueda
@@ -510,11 +586,56 @@ const estadoForm = useForm({
   estado: 'Confirmado',
   observaciones: ''
 });
+const citaEditForm = useForm({
+  paciente_id: '',
+  especialista_id: '',
+  servicios: [],
+  fecha: '',
+  hora_inicio: '',
+  holgura_min: 15
+});
+
+const serviciosEdicion = computed(() => {
+  const especialistaId = Number(citaEditForm.especialista_id || 0);
+  return (props.servicios_lista || []).filter((servicio) => {
+    return !especialistaId || (servicio.especialistas || []).some((especialista) => Number(especialista.id) === especialistaId);
+  });
+});
 
 const verDetalle = (cita) => {
   citaSeleccionada.value = cita;
   estadoForm.estado = cita.estado || 'Confirmado';
   estadoForm.observaciones = cita.observaciones || '';
+};
+
+const abrirEdicionCita = (cita) => {
+  citaSeleccionada.value = cita;
+  citaEditForm.paciente_id = cita.paciente_id;
+  citaEditForm.especialista_id = cita.especialista_id;
+  citaEditForm.servicios = (cita.servicio_ids || []).map((id) => Number(id));
+  citaEditForm.fecha = filterForm.value.fecha;
+  citaEditForm.hora_inicio = convertirHoraA24(cita.hora_inicio);
+  citaEditForm.holgura_min = 15;
+  citaEditForm.clearErrors();
+};
+
+const convertirHoraA24 = (hora) => {
+  const partes = hora.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!partes) return hora;
+  let horas = Number(partes[1]);
+  if (partes[3].toUpperCase() === 'PM' && horas !== 12) horas += 12;
+  if (partes[3].toUpperCase() === 'AM' && horas === 12) horas = 0;
+  return `${String(horas).padStart(2, '0')}:${partes[2]}`;
+};
+
+const guardarEdicionCita = () => {
+  citaEditForm.put('/agenda/' + citaSeleccionada.value.id, {
+    preserveScroll: true,
+    onSuccess: () => {
+      const modal = bootstrap.Modal.getInstance(document.getElementById('modalEditarCita'));
+      if (modal) modal.hide();
+    }
+  });
 };
 
 const guardarEstadoTurno = () => {

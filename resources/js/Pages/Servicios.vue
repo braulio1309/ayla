@@ -8,7 +8,7 @@
           <h2 class="brand-font fw-bold text-ayla-dark mb-0">Catálogo de Servicios & Costos</h2>
           <p class="text-muted small mb-0">Configuración de precios base, tiempos de duración e información de tratamientos</p>
         </div>
-        <button class="btn btn-ayla-primary px-4" @click="abrirModalCrear" data-bs-toggle="modal" data-bs-target="#modalServicio">
+        <button v-if="isAdmin" class="btn btn-ayla-primary px-4" @click="abrirModalCrear" data-bs-toggle="modal" data-bs-target="#modalServicio">
           <i class="bi bi-plus-circle me-1"></i> Nuevo Servicio
         </button>
       </div>
@@ -67,7 +67,7 @@
               <span class="small text-muted fw-medium">
                 <i class="bi bi-clock me-1 text-ayla-rose"></i> {{ s.duracion_min }} Minutos
               </span>
-              <button 
+              <button v-if="isAdmin"
                 class="btn btn-sm btn-ayla-outline" 
                 @click="abrirModalEditar(s)"
                 data-bs-toggle="modal" 
@@ -175,7 +175,7 @@
 
 <script setup>
 import MainLayout from '../Layouts/MainLayout.vue';
-import { router, useForm } from '@inertiajs/vue3';
+import { router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 
 const props = defineProps({
@@ -186,6 +186,7 @@ const props = defineProps({
 });
 
 const especialistas_lista = computed(() => props.especialistas || []);
+const isAdmin = computed(() => usePage().props.auth?.user?.role === 'admin');
 
 // Filtros Reactivos
 const searchQuery = ref(props.filters.search || '');

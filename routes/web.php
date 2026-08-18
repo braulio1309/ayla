@@ -30,6 +30,7 @@ Route::middleware(['auth'])->group(function () {
     // Módulo de Servicios
     Route::get('/servicios', [ServicioController::class, 'index'])->name('servicios.index');
     Route::post('/servicios', [ServicioController::class, 'store'])->name('servicios.store');
+    Route::put('/servicios/{servicio}', [ServicioController::class, 'update'])->name('servicios.update');
 
     // Módulo de Usuarios y Especialistas
     Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
