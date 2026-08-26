@@ -14,6 +14,8 @@ class Cita extends Model
     protected $fillable = [
         'paciente_id',
         'user_id',
+        'asistente_id',
+        'comision_asistente_porcentaje',
         'fecha',
         'hora_inicio',
         'hora_fin',
@@ -35,6 +37,7 @@ class Cita extends Model
         'tasa_dolar_bcv' => 'decimal:4',
         'tasa_euro_bcv' => 'decimal:4',
         'monto_total_bs' => 'decimal:2',
+        'comision_asistente_porcentaje' => 'decimal:2',
         'holgura_min' => 'integer',
         'whatsapp_creacion_enviado_at' => 'datetime',
         'whatsapp_recordatorio_enviado_at' => 'datetime',
@@ -48,6 +51,11 @@ class Cita extends Model
     public function especialista(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function asistente(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'asistente_id');
     }
 
     public function servicios(): BelongsToMany

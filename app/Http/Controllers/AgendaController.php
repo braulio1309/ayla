@@ -52,13 +52,14 @@ class AgendaController extends Controller
         $validated = $request->validate([
             'paciente_id' => 'required|exists:pacientes,id',
             'especialista_id' => 'required|exists:users,id',
+            'asistente_id' => 'nullable|exists:users,id|different:especialista_id',
             'servicios' => 'required|array|min:1',
             'precios_servicios' => 'nullable|array',
             'precios_servicios.*' => 'nullable|numeric|min:0',
             'fecha' => 'required|date',
             'hora_inicio' => 'required',
             'holgura_min' => 'required|numeric',
-            'recurrencia' => 'nullable|string|in:ninguna,semanal,quincenal,mensual',
+            'recurrencia' => 'nullable|string|in:ninguna,diario,semanal,quincenal,mensual',
             'dias_semana' => 'nullable|array',
             'dias_semana.*' => 'integer|min:0|max:6',
             'cantidad_sesiones' => 'nullable|integer|min:1|max:60',
@@ -75,6 +76,10 @@ class AgendaController extends Controller
             ? Auth::id()
             : $validated['especialista_id'];
         $validated['especialista_id'] = $especialistaId;
+
+        if (!empty($validated['asistente_id'])) {
+            abort_unless(User::whereKey($validated['asistente_id'])->where('role', 'especialista')->exists(), 422, 'El asistente debe ser un especialista.');
+        }
 
         $duracionTotal = $serviciosSeleccionados->sum(function ($servicio) {
             return (int) ($servicio->duracion_min ?? 0);
@@ -123,6 +128,8 @@ class AgendaController extends Controller
             $cita = Cita::create([
                 'paciente_id' => $paciente->id,
                 'user_id' => $validated['especialista_id'],
+                'asistente_id' => $validated['asistente_id'] ?? null,
+                'comision_asistente_porcentaje' => !empty($validated['asistente_id']) ? 3 : null,
                 'fecha' => $fechaCarbon->format('Y-m-d'),
                 'hora_inicio' => $horaInicio->format('H:i:s'),
                 'hora_fin' => $horaFin->format('H:i:s'),
@@ -162,6 +169,13 @@ class AgendaController extends Controller
         if ($especialistaAsignado) {
             foreach ($citasCreadas as $citaCreada) {
                 Notification::send($especialistaAsignado, new NuevaCitaAsignada($citaCreada, $paciente, $serviciosSeleccionados));
+
+                if (!empty($validated['asistente_id'])) {
+                    $asistente = User::find($validated['asistente_id']);
+                    if ($asistente) {
+                        Notification::send($asistente, new NuevaCitaAsignada($citaCreada, $paciente, $serviciosSeleccionados));
+                    }
+                }
             }
 
             if ($especialistaAsignado->id !== Auth::id()) {
@@ -289,6 +303,16 @@ class AgendaController extends Controller
             while (count($fechas) < $cantidadSesiones) {
                 $fechas[] = $fechaActual->format('Y-m-d');
                 $fechaActual = $fechaActual->copy()->addMonth();
+            }
+
+            return $fechas;
+        }
+
+        if ($tipo === 'diario') {
+            $fechaActual = $inicio->copy();
+            while (count($fechas) < $cantidadSesiones) {
+                $fechas[] = $fechaActual->format('Y-m-d');
+                $fechaActual->addDay();
             }
 
             return $fechas;

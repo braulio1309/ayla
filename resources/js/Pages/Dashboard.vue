@@ -133,7 +133,7 @@
                     <td><strong>{{ c.hora }}</strong></td>
                     <td>{{ c.paciente }}</td>
                     <td>{{ c.servicio }}</td>
-                    <td>{{ c.especialista }}</td>
+                    <td>{{ c.especialista }}<br><span v-if="c.asistente" class="small text-ayla-rose">Asistente: {{ c.asistente }} (3%)</span></td>
                     <td><strong>${{ c.monto.toFixed(2) }}</strong><br><span class="small text-ayla-rose">Bs. {{ Number(c.monto_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span></td>
                     <td>
                       <span class="badge" :class="{
@@ -216,6 +216,14 @@
                   <select class="form-select" v-model="formTurno.especialista_id" required>
                     <option value="">Seleccionar especialista...</option>
                     <option v-for="e in especialistas_lista" :key="e.id" :value="e.id">{{ e.name }}</option>
+                  </select>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label fw-medium">Asistente (opcional)</label>
+                  <select class="form-select" v-model="formTurno.asistente_id">
+                    <option value="">Sin asistente</option>
+                    <option v-for="e in asistentesDisponibles" :key="e.id" :value="e.id">{{ e.name }} (3%)</option>
                   </select>
                 </div>
 
@@ -408,11 +416,16 @@ const serviciosState = ref(
 const formTurno = useForm({
   paciente_id: '',
   especialista_id: '',
+  asistente_id: '',
   servicios: [],
   fecha: new Date().toISOString().substr(0, 10),
   hora_inicio: '09:00',
   holgura_min: 15
 });
+
+const asistentesDisponibles = computed(() => props.especialistas_lista.filter((especialista) => {
+  return Number(especialista.id) !== Number(formTurno.especialista_id || 0);
+}));
 
 // Cálculos computados reactivos
 const duracionTotal = computed(() => {

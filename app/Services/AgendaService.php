@@ -20,7 +20,7 @@ class AgendaService
         $fecha = $fecha ?: now()->format('Y-m-d');
         $fechaCarbon = Carbon::parse($fecha);
 
-        $query = Cita::with(['paciente', 'servicios', 'especialista'])
+        $query = Cita::with(['paciente', 'servicios', 'especialista', 'asistente'])
             ->whereDate('fecha', $fecha);
 
         $usuarioActual = Auth::user();
@@ -52,6 +52,9 @@ class AgendaService
                 'servicio' => $cita->servicios->pluck('nombre')->join(', ') ?: 'Sin servicio',
                 'especialista' => ($cita->especialista ? $cita->especialista->name : null) ?? 'Sin especialista',
                 'especialista_id' => $cita->user_id,
+                'asistente' => $cita->asistente?->name,
+                'asistente_id' => $cita->asistente_id,
+                'comision_asistente_porcentaje' => (float) ($cita->comision_asistente_porcentaje ?? 0),
                 'monto' => (float) ($cita->monto_total ?? 0),
                 'monto_bs' => (float) ($cita->monto_total_bs ?? 0),
                 'tasa_dolar_bcv' => (float) ($cita->tasa_dolar_bcv ?? 0),

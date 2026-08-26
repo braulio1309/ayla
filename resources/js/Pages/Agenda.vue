@@ -91,6 +91,7 @@
                     <div class="small text-muted mt-1"><i class="bi bi-clock me-1"></i> {{ turno.hora_inicio }} - {{ turno.hora_fin }} ({{ turno.duracion_min }} min)</div>
                     <div class="small fw-medium text-ayla-dark">{{ turno.servicio }}</div>
                     <div class="small text-muted"><em>Esp: {{ turno.especialista }}</em></div>
+                    <div v-if="turno.asistente" class="small text-muted"><em>Asistente: {{ turno.asistente }} (3%)</em></div>
                     <div class="small text-muted mt-1">Cabina: {{ turno.cabina }}</div>
                     <div class="mt-2 d-flex justify-content-between align-items-center">
                       <span class="badge" :class="estadoBadgeClass(turno.estado)">{{ turno.estado }}</span>
@@ -205,6 +206,14 @@
                   </select>
                 </div>
 
+                <div class="col-md-6">
+                  <label class="form-label fw-medium">Asistente (opcional)</label>
+                  <select class="form-select" v-model="formTurno.asistente_id" :disabled="isSpecialist">
+                    <option value="">Sin asistente</option>
+                    <option v-for="e in asistentesDisponibles" :key="e.id" :value="e.id">{{ e.name }} (3%)</option>
+                  </select>
+                </div>
+
                 <div v-if="disponibilidadMensaje" class="col-12">
                   <div class="alert alert-warning mb-0 py-2 px-3 small" role="alert">
                     <i class="bi bi-exclamation-triangle me-2"></i>{{ disponibilidadMensaje }}
@@ -282,15 +291,19 @@
 
                 <div v-if="formTurno.recurrencia !== 'ninguna'" class="col-12">
                   <div class="border rounded p-3 bg-light">
-                    <label class="form-label fw-medium">Días de la semana</label>
-                    <div class="d-flex flex-wrap gap-2 mb-3">
-                      <label v-for="dia in diasSemanaOptions" :key="dia.value" class="btn btn-sm border rounded-pill px-3" :class="{
-                        'btn-ayla-primary text-white': formTurno.dias_semana.includes(dia.value),
-                        'btn-outline-secondary': !formTurno.dias_semana.includes(dia.value)
-                      }">
-                        <input type="checkbox" class="form-check-input me-2" :value="dia.value" v-model="formTurno.dias_semana">{{ dia.label }}
-                      </label>
+                    <div v-if="formTurno.recurrencia !== 'diario'">
+                      <label class="form-label fw-medium">Días de la semana</label>
+                      <div class="d-flex flex-wrap gap-2 mb-3">
+                        <label v-for="dia in diasSemanaOptions" :key="dia.value" class="btn btn-sm border rounded-pill px-3" :class="{
+                          'btn-ayla-primary text-white': formTurno.dias_semana.includes(dia.value),
+                          'btn-outline-secondary': !formTurno.dias_semana.includes(dia.value)
+                        }">
+                          <input type="checkbox" class="form-check-input me-2" :value="dia.value" v-model="formTurno.dias_semana">{{ dia.label }}
+                        </label>
+                      </div>
                     </div>
+
+                    <div v-else class="small text-muted mb-3">Se agendará una sesión diaria.</div>
 
                     <div v-if="formTurno.recurrencia === 'mensual'" class="small text-muted mb-2">
                       La serie mensual se repite en la misma fecha del mes desde la fecha de inicio.
@@ -691,6 +704,7 @@ const diasSemanaOptions = [
 const formTurno = useForm({
   paciente_id: '',
   especialista_id: isSpecialist.value ? (authUser.value?.id || '') : '',
+  asistente_id: '',
   servicios: [],
   precios_servicios: {},
   fecha: props.filters.fecha || new Date().toISOString().substr(0, 10),
@@ -716,6 +730,10 @@ const serviciosDisponibles = computed(() => {
     return servicio.especialistas.some((especialista) => Number(especialista.id) === especialistaId);
   });
 });
+
+const asistentesDisponibles = computed(() => props.especialistas_lista.filter((especialista) => {
+  return Number(especialista.id) !== Number(formTurno.especialista_id || 0);
+}));
 
 const serviciosState = ref([]);
 
@@ -769,6 +787,15 @@ const sesionesSeleccionadas = computed(() => {
     : Math.max(1, Number(formTurno.cantidad_sesiones) || 1);
 });
 
+watch(
+  () => formTurno.recurrencia,
+  (recurrencia) => {
+    if (recurrencia === 'diario') {
+      formTurno.dias_semana = [];
+    }
+  }
+);
+
 const estadoClass = (estado) => {
   if (estado === 'Completado') return 'completado';
   if (estado === 'En Proceso') return 'en-proceso';
@@ -801,7 +828,7 @@ const guardarTurno = () => {
     formTurno.cantidad_sesiones = 1;
   }
 
-  if (formTurno.recurrencia !== 'ninguna' && formTurno.dias_semana.length === 0) {
+  if (formTurno.recurrencia !== 'ninguna' && formTurno.recurrencia !== 'diario' && formTurno.dias_semana.length === 0) {
     const fechaInicio = new Date(formTurno.fecha);
     const dayIndex = (fechaInicio.getDay() + 6) % 7;
     formTurno.dias_semana = [dayIndex];

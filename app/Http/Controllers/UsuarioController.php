@@ -130,6 +130,8 @@ class UsuarioController extends Controller
             'total_generado_bs' => $data['total_generado_bs'] ?? 0,
             'comision_total' => $data['comision_total'] ?? 0,
             'comision_total_bs' => $data['comision_total_bs'] ?? 0,
+            'comision_asistente' => $data['comision_asistente'] ?? 0,
+            'comision_asistente_bs' => $data['comision_asistente_bs'] ?? 0,
             'filters' => $data['filters'],
             'atenciones' => $data['atenciones'] ?? [],
         ]);

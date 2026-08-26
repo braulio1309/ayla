@@ -101,6 +101,7 @@
                 <th>Citas Completadas</th>
                 <th>Generado por especialista</th>
                 <th>Comisión del especialista</th>
+                <th>Comisión asistente</th>
                 <th>Restante para el negocio</th>
                 <th>% Aporte Negocio</th>
               </tr>
@@ -112,6 +113,7 @@
                 <td>{{ item.citas_completadas }}</td>
                 <td class="fw-bold text-success">${{ item.ingreso_generado.toFixed(2) }}<br><span class="small text-ayla-rose">Bs. {{ Number(item.ingreso_generado_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span></td>
                 <td class="fw-bold text-ayla-dark">${{ item.comision_especialista.toFixed(2) }}</td>
+                <td class="fw-bold text-ayla-rose">${{ Number(item.comision_asistentes || 0).toFixed(2) }}</td>
                 <td class="fw-bold text-primary">${{ item.ganancia_negocio.toFixed(2) }}</td>
                 <td>{{ item.aporte_porcentaje }}</td>
               </tr>
@@ -139,6 +141,7 @@
                 <th>Hora</th>
                 <th>Paciente</th>
                 <th>Servicio</th>
+                <th>Asistente</th>
                 <th>Estado</th>
                 <th class="text-end">Monto</th>
               </tr>
@@ -149,11 +152,12 @@
                 <td>{{ agenda.hora }}</td>
                 <td class="fw-bold text-ayla-dark">{{ agenda.paciente }}</td>
                 <td>{{ agenda.servicio }}</td>
+                <td>{{ agenda.asistente ? `${agenda.asistente} (3%)` : 'Sin asistente' }}</td>
                 <td><span class="badge bg-ayla-rose">{{ agenda.estado }}</span></td>
                 <td class="text-end fw-bold">${{ Number(agenda.monto).toFixed(2) }}<br><span class="small text-ayla-rose">Bs. {{ formatoBs(agenda.monto_bs) }}</span></td>
               </tr>
               <tr v-if="agendas.length === 0">
-                <td colspan="6" class="text-center py-4 text-muted">No hay agendas para los filtros seleccionados.</td>
+                <td colspan="7" class="text-center py-4 text-muted">No hay agendas para los filtros seleccionados.</td>
               </tr>
             </tbody>
           </table>

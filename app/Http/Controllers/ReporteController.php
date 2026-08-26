@@ -46,7 +46,7 @@ class ReporteController extends Controller
         return response()->streamDownload(function () use ($data) {
             echo "\xEF\xBB\xBF";
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Fecha', 'Hora', 'Paciente', 'Servicio', 'Estado', 'Monto USD', 'Monto Bs'], ';');
+            fputcsv($handle, ['Fecha', 'Hora', 'Paciente', 'Servicio', 'Asistente', 'Estado', 'Monto USD', 'Monto Bs'], ';');
 
             foreach ($data['agendas'] as $agenda) {
                 fputcsv($handle, [
@@ -54,6 +54,7 @@ class ReporteController extends Controller
                     $agenda['hora'],
                     $agenda['paciente'],
                     $agenda['servicio'],
+                    $agenda['asistente'] ? $agenda['asistente'] . ' (3%)' : 'Sin asistente',
                     $agenda['estado'],
                     number_format($agenda['monto'], 2, ',', ''),
                     number_format($agenda['monto_bs'], 2, ',', ''),

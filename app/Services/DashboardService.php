@@ -18,7 +18,7 @@ class DashboardService
     {
         $hoy = now()->format('Y-m-d');
 
-        $citasHoy = Cita::with(['paciente', 'servicios', 'especialista'])
+        $citasHoy = Cita::with(['paciente', 'servicios', 'especialista', 'asistente'])
             ->whereDate('fecha', $hoy)
             ->orderBy('hora_inicio')
             ->get()
@@ -29,6 +29,7 @@ class DashboardService
                     'paciente' => ($cita->paciente ? $cita->paciente->nombre : null) ?? 'Sin paciente',
                     'servicio' => $cita->servicios->pluck('nombre')->join(', ') ?: 'Sin servicio',
                     'especialista' => ($cita->especialista ? $cita->especialista->name : null) ?? 'Sin especialista',
+                    'asistente' => $cita->asistente?->name,
                     'monto' => (float)($cita->monto_total ?? 0),
                     'monto_bs' => (float)($cita->monto_total_bs ?? 0),
                     'duracion_min' => (int)($cita->duracion_total ?? 0),

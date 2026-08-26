@@ -33,6 +33,7 @@
             <span class="small text-muted d-block mb-2">Mi comisión</span>
             <h3 class="brand-font fw-bold text-success mb-0">${{ comisionTotalSeguro.toFixed(2) }}</h3>
             <span class="text-ayla-rose small">Bs. {{ formatoBs(comisionTotalBsSeguro) }}</span>
+            <span class="text-muted small d-block mt-2">Por asistencias: ${{ Number(props.comision_asistente || 0).toFixed(2) }} / Bs. {{ formatoBs(props.comision_asistente_bs) }}</span>
           </div>
         </div>
       </div>
@@ -66,6 +67,7 @@
                 <th>Fecha</th>
                 <th>Paciente Atendido</th>
                 <th>Servicios Realizados</th>
+                <th>Participación</th>
                 <th class="text-end">Monto Generado</th>
               </tr>
             </thead>
@@ -74,10 +76,14 @@
                 <td>{{ a.fecha }}</td>
                 <td class="fw-bold text-ayla-dark">{{ a.paciente }}</td>
                 <td>{{ a.servicio }}</td>
+                <td>
+                  <span v-if="a.es_asistente" class="badge bg-ayla-rose">Asistente (3%)</span>
+                  <span v-else class="badge bg-ayla-dark">Principal</span>
+                </td>
                 <td class="text-end fw-bold text-success">${{ Number(a.monto ?? 0).toFixed(2) }}<br><span class="small text-ayla-rose">Bs. {{ formatoBs(a.monto_bs) }}</span></td>
               </tr>
               <tr v-if="atencionesSeguras.length === 0">
-                <td colspan="4" class="text-center py-4 text-muted">
+                <td colspan="5" class="text-center py-4 text-muted">
                   No se registraron atenciones en el intervalo de fechas seleccionado.
                 </td>
               </tr>
@@ -101,6 +107,8 @@ const props = defineProps({
   total_generado_bs: Number,
   comision_total: Number,
   comision_total_bs: Number,
+  comision_asistente: Number,
+  comision_asistente_bs: Number,
   atenciones: Array,
   filters: Object
 });

@@ -19,6 +19,9 @@ class ReporteService
             'especialista' => function ($query) {
                 $query->select('id', 'name', 'role', 'comision');
             },
+            'asistente' => function ($query) {
+                $query->select('id', 'name');
+            },
             'servicios' => function ($query) {
                 $query->select('servicios.id', 'servicios.nombre');
             },
@@ -48,7 +51,10 @@ class ReporteService
             $totalBs = (float) $items->sum('monto_total_bs');
             $porcentajeComision = $especialista && $especialista->role === 'especialista' ? (float) ($especialista->comision ?? 0) : 0;
             $comisionEspecialista = round($total * ($porcentajeComision / 100), 2);
-            $negocio = round($total - $comisionEspecialista, 2);
+            $comisionAsistentes = round($items->sum(function ($cita) {
+                return $cita->asistente_id ? (float) $cita->monto_total * ((float) ($cita->comision_asistente_porcentaje ?? 3) / 100) : 0;
+            }), 2);
+            $negocio = round($total - $comisionEspecialista - $comisionAsistentes, 2);
             $porcentaje = $totalGeneral > 0 ? round(($total / $totalGeneral) * 100, 1) : 0;
             $categoria = 'Sin categoría';
 
@@ -63,12 +69,14 @@ class ReporteService
                 'ingreso_generado' => round($total, 2),
                 'ingreso_generado_bs' => round($totalBs, 2),
                 'comision_especialista' => $comisionEspecialista,
+                'comision_asistentes' => $comisionAsistentes,
                 'ganancia_negocio' => $negocio,
                 'aporte_porcentaje' => $porcentaje . '%',
             ];
         })->values()->all();
 
         $totalComisionEspecialistas = round(array_sum(array_column($auditoria, 'comision_especialista')), 2);
+        $totalComisionAsistentes = round(array_sum(array_column($auditoria, 'comision_asistentes')), 2);
         $totalNegocio = round(array_sum(array_column($auditoria, 'ganancia_negocio')), 2);
 
         $agendas = $citas->sortByDesc('fecha')->values()->map(function ($cita) {
@@ -78,6 +86,8 @@ class ReporteService
                 'hora' => $cita->hora_inicio ? substr((string) $cita->hora_inicio, 0, 5) : 'N/A',
                 'paciente' => $cita->paciente?->nombre ?? 'Sin paciente',
                 'servicio' => $cita->servicios->pluck('nombre')->join(', ') ?: 'Sin servicio',
+                'asistente' => $cita->asistente?->name,
+                'comision_asistente_porcentaje' => (float) ($cita->comision_asistente_porcentaje ?? 0),
                 'estado' => $cita->estado,
                 'monto' => (float) ($cita->monto_total ?? 0),
                 'monto_bs' => (float) ($cita->monto_total_bs ?? 0),
@@ -94,6 +104,7 @@ class ReporteService
                 'ingresos_brutos' => (float) $citas->sum('monto_total'),
                 'ingresos_brutos_bs' => $totalGeneralBs,
                 'total_comision_especialistas' => $totalComisionEspecialistas,
+                'total_comision_asistentes' => $totalComisionAsistentes,
                 'total_negocio' => $totalNegocio,
                 'total_citas' => $citas->count(),
                 'promedio_cita' => $citas->count() > 0 ? round($citas->sum('monto_total') / $citas->count(), 2) : 0,
