@@ -55,9 +55,11 @@ class AgendaService
                 ? round($subtotalServiciosBs * (((float) ($cita->comision_asistente_porcentaje ?? 0)) / 100), 2)
                 : 0;
 
-            $serviciosDetalle = $cita->servicios->map(function ($servicio) use ($cita) {
+            $especialistasCita = User::whereIn('id', $cita->servicios->pluck('pivot.especialista_id')->filter()->unique())->get()->keyBy('id');
+
+            $serviciosDetalle = $cita->servicios->map(function ($servicio) use ($cita, $especialistasCita) {
                 $espId = (int) ($servicio->pivot->especialista_id ?: $cita->user_id);
-                $espNombre = $espId === (int) $cita->user_id ? ($cita->especialista?->name ?? 'Especialista') : (User::find($espId)?->name ?? 'Especialista');
+                $espNombre = $espId === (int) $cita->user_id ? ($cita->especialista?->name ?? 'Especialista') : ($especialistasCita->get($espId)?->name ?? 'Especialista');
                 $precio = (float) ($servicio->pivot->precio_momento ?? 0);
                 $precioBs = (float) ($servicio->pivot->monto_bs_momento ?? 0);
                 $comisionPct = (float) ($servicio->pivot->comision_momento ?? 0);
@@ -103,14 +105,15 @@ class AgendaService
         })->values()->all();
 
         $calendario = $this->buildCalendarioData($fechaCarbon, $usuarioActual, $especialistaId, $estado);
+        $tasaEuro = (float) $this->tasaCambioService->obtener()->euro_bcv;
+
         $serviciosLista = Servicio::with(['especialistas' => function ($query) use ($especialistaId, $usuarioActual) {
             if ($especialistaId) {
                 $query->where('users.id', $especialistaId);
             } elseif ($usuarioActual && $usuarioActual->role === 'especialista') {
                 $query->where('users.id', $usuarioActual->id);
             }
-        }])->get()->map(function ($s) use ($especialistaId, $usuarioActual) {
-            $tasaEuro = (float) $this->tasaCambioService->obtener()->euro_bcv;
+        }])->get()->map(function ($s) use ($especialistaId, $usuarioActual, $tasaEuro) {
             $especialistaAsignado = $especialistaId
                 ? $s->especialistas->first()
                 : ($usuarioActual && $usuarioActual->role === 'especialista'
@@ -160,7 +163,7 @@ class AgendaService
 
     private function buildCalendarioData(Carbon $fecha, ?User $usuarioActual = null, ?int $especialistaId = null, ?string $estado = null): array
     {
-        $query = Cita::with(['paciente', 'servicios', 'especialista'])
+        $query = Cita::query()
             ->whereYear('fecha', $fecha->year)
             ->whereMonth('fecha', $fecha->month);
 
@@ -174,15 +177,10 @@ class AgendaService
             $query->where('estado', $this->mapEstadoParaBaseDatos($estado));
         }
 
-        $conteoPorDia = [];
-        foreach ($query->get() as $cita) {
-            $dia = $cita->fecha ? Carbon::parse($cita->fecha)->format('Y-m-d') : null;
-            if ($dia) {
-                $conteoPorDia[$dia] = ($conteoPorDia[$dia] ?? 0) + 1;
-            }
-        }
-
-        return $conteoPorDia;
+        return $query->selectRaw('DATE(fecha) as fecha_str, COUNT(*) as total')
+            ->groupBy('fecha_str')
+            ->pluck('total', 'fecha_str')
+            ->toArray();
     }
 
     private function normalizarEstado($estado): string

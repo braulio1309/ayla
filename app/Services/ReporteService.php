@@ -58,7 +58,9 @@ class ReporteService
                         'ingreso_generado' => 0,
                         'ingreso_generado_bs' => 0,
                         'comision_especialista' => 0,
+                        'comision_especialista_bs' => 0,
                         'comision_asistentes' => 0,
+                        'comision_asistentes_bs' => 0,
                     ];
                 }
 
@@ -74,6 +76,7 @@ class ReporteService
                 $auditoriaMap[$espId]['ingreso_generado'] += $precio;
                 $auditoriaMap[$espId]['ingreso_generado_bs'] += $precioBs;
                 $auditoriaMap[$espId]['comision_especialista'] += round($precio * ($comisionPct / 100), 2);
+                $auditoriaMap[$espId]['comision_especialista_bs'] += round($precioBs * ($comisionPct / 100), 2);
             }
 
             if ($cita->asistente_id) {
@@ -88,27 +91,39 @@ class ReporteService
                         'ingreso_generado' => 0,
                         'ingreso_generado_bs' => 0,
                         'comision_especialista' => 0,
+                        'comision_especialista_bs' => 0,
                         'comision_asistentes' => 0,
+                        'comision_asistentes_bs' => 0,
                     ];
                 }
                 $subtotalCita = (float) $cita->servicios->sum('pivot.precio_momento');
                 if ($subtotalCita <= 0) $subtotalCita = (float) $cita->monto_total;
-                $montoAsistente = round($subtotalCita * (((float) ($cita->comision_asistente_porcentaje ?? 0)) / 100), 2);
-                $auditoriaMap[$asistenteId]['comision_asistentes'] += $montoAsistente;
+
+                $subtotalCitaBs = (float) $cita->servicios->sum('pivot.monto_bs_momento');
+                if ($subtotalCitaBs <= 0) $subtotalCitaBs = (float) $cita->monto_total_bs;
+
+                $pct = (float) ($cita->comision_asistente_porcentaje ?? 0);
+                $auditoriaMap[$asistenteId]['comision_asistentes'] += round($subtotalCita * ($pct / 100), 2);
+                $auditoriaMap[$asistenteId]['comision_asistentes_bs'] += round($subtotalCitaBs * ($pct / 100), 2);
             }
         }
 
-        $auditoria = array_values(array_map(function ($item) use ($totalGeneral) {
+        $auditoria = array_values(array_map(function ($item) use ($totalGeneral, $totalGeneralBs) {
             $totalGenerado = $item['ingreso_generado'];
+            $totalGeneradoBs = $item['ingreso_generado_bs'];
             $item['ganancia_negocio'] = round($totalGenerado - $item['comision_especialista'] - $item['comision_asistentes'], 2);
+            $item['ganancia_negocio_bs'] = round($totalGeneradoBs - $item['comision_especialista_bs'] - $item['comision_asistentes_bs'], 2);
             $item['aporte_porcentaje'] = $totalGeneral > 0 ? round(($totalGenerado / $totalGeneral) * 100, 1) . '%' : '0%';
             unset($item['citas_ids']);
             return $item;
         }, $auditoriaMap));
 
         $totalComisionEspecialistas = round(array_sum(array_column($auditoria, 'comision_especialista')), 2);
+        $totalComisionEspecialistasBs = round(array_sum(array_column($auditoria, 'comision_especialista_bs')), 2);
         $totalComisionAsistentes = round(array_sum(array_column($auditoria, 'comision_asistentes')), 2);
+        $totalComisionAsistentesBs = round(array_sum(array_column($auditoria, 'comision_asistentes_bs')), 2);
         $totalNegocio = round(array_sum(array_column($auditoria, 'ganancia_negocio')), 2);
+        $totalNegocioBs = round(array_sum(array_column($auditoria, 'ganancia_negocio_bs')), 2);
 
         $agendas = $citas->sortByDesc('fecha')->values()->map(function ($cita) {
             return [
@@ -135,8 +150,11 @@ class ReporteService
                 'ingresos_brutos' => (float) $citas->sum('monto_total'),
                 'ingresos_brutos_bs' => $totalGeneralBs,
                 'total_comision_especialistas' => $totalComisionEspecialistas,
+                'total_comision_especialistas_bs' => $totalComisionEspecialistasBs,
                 'total_comision_asistentes' => $totalComisionAsistentes,
+                'total_comision_asistentes_bs' => $totalComisionAsistentesBs,
                 'total_negocio' => $totalNegocio,
+                'total_negocio_bs' => $totalNegocioBs,
                 'total_citas' => $citas->count(),
                 'promedio_cita' => $citas->count() > 0 ? round($citas->sum('monto_total') / $citas->count(), 2) : 0,
                 'top_especialista' => $auditoria[0]['especialista'] ?? 'Sin datos',

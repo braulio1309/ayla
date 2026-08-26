@@ -70,7 +70,8 @@
           <div class="card-ayla p-4 bg-ayla-cream text-ayla-dark h-100">
             <span class="small text-muted d-block mb-1">Comisión Especialistas</span>
             <h2 class="brand-font fw-bold mb-1">${{ kpis.total_comision_especialistas.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}</h2>
-            <span class="small text-muted">Total pagado a profesionales</span>
+            <span class="d-block text-ayla-rose fw-bold small">Bs. {{ Number(kpis.total_comision_especialistas_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+            <span class="small text-muted">Total pagado a profesionales (tasa euro)</span>
           </div>
         </div>
 
@@ -78,6 +79,7 @@
           <div class="card-ayla p-4 bg-ayla-rose text-white h-100">
             <span class="small text-white-50 d-block mb-1">Ganancia del Negocio</span>
             <h2 class="brand-font fw-bold mb-1">${{ kpis.total_negocio.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}</h2>
+            <span class="d-block text-white fw-bold small">Bs. {{ Number(kpis.total_negocio_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
             <span class="small text-white-50">Monto restante después de comisiones</span>
           </div>
         </div>
@@ -112,9 +114,9 @@
                 <td>{{ item.categoria }}</td>
                 <td>{{ item.citas_completadas }}</td>
                 <td class="fw-bold text-success">${{ item.ingreso_generado.toFixed(2) }}<br><span class="small text-ayla-rose">Bs. {{ Number(item.ingreso_generado_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span></td>
-                <td class="fw-bold text-ayla-dark">${{ item.comision_especialista.toFixed(2) }}</td>
-                <td class="fw-bold text-ayla-rose">${{ Number(item.comision_asistentes || 0).toFixed(2) }}</td>
-                <td class="fw-bold text-primary">${{ item.ganancia_negocio.toFixed(2) }}</td>
+                <td class="fw-bold text-ayla-dark">${{ item.comision_especialista.toFixed(2) }}<br><span class="small text-ayla-rose">Bs. {{ Number(item.comision_especialista_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span></td>
+                <td class="fw-bold text-ayla-rose">${{ Number(item.comision_asistentes || 0).toFixed(2) }}<br><span class="small text-ayla-dark">Bs. {{ Number(item.comision_asistentes_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span></td>
+                <td class="fw-bold text-primary">${{ item.ganancia_negocio.toFixed(2) }}<br><span class="small text-ayla-rose">Bs. {{ Number(item.ganancia_negocio_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span></td>
                 <td>{{ item.aporte_porcentaje }}</td>
               </tr>
             </tbody>
