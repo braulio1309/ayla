@@ -397,7 +397,7 @@
 <script setup>
 import MainLayout from '../Layouts/MainLayout.vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 
 const props = defineProps({
   kpis: Object,
@@ -418,6 +418,13 @@ const tasasForm = ref({
   dolar_bcv: Number(props.tasas?.dolar_bcv || 0),
   euro_bcv: Number(props.tasas?.euro_bcv || 0)
 });
+
+watch(() => props.tasas, (nuevasTasas) => {
+  if (nuevasTasas) {
+    tasasForm.value.dolar_bcv = Number(nuevasTasas.dolar_bcv || 0);
+    tasasForm.value.euro_bcv = Number(nuevasTasas.euro_bcv || 0);
+  }
+}, { deep: true });
 const actualizarTasas = () => {
   useForm(tasasForm.value).post('/tasas-cambio');
 };
