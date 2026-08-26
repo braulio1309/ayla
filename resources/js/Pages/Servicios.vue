@@ -122,10 +122,24 @@
                   <span v-if="formServicio.errors.precio_base" class="text-danger small">{{ formServicio.errors.precio_base }}</span>
                 </div>
 
-                <div class="col-12">
+                <div class="col-md-6">
+                  <label class="form-label fw-medium">Comisión Adicional ($ USD)</label>
+                  <input type="number" step="0.01" class="form-control" v-model="formServicio.comision_adicional" placeholder="0.00">
+                  <span v-if="formServicio.errors.comision_adicional" class="text-danger small">{{ formServicio.errors.comision_adicional }}</span>
+                </div>
+
+                <div class="col-md-6">
                   <label class="form-label fw-medium">Duración Estimada (en Minutos)</label>
                   <input type="number" class="form-control" v-model="formServicio.duracion_min" placeholder="60" required>
                   <span v-if="formServicio.errors.duracion_min" class="text-danger small">{{ formServicio.errors.duracion_min }}</span>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label fw-medium">Recurrente</label>
+                  <select class="form-select" v-model="formServicio.es_recurrente">
+                    <option :value="true">Sí, es recurrente</option>
+                    <option :value="false">No, es puntual</option>
+                  </select>
                 </div>
 
                 <div class="col-12">
@@ -216,7 +230,9 @@ const formServicio = useForm({
   nombre: '',
   categoria: '',
   precio_base: '',
+  comision_adicional: 0,
   duracion_min: '',
+  es_recurrente: true,
   descripcion: '',
   especialistas: [],
   precios_especialistas: {}
@@ -238,7 +254,9 @@ const abrirModalEditar = (servicio) => {
   formServicio.nombre = servicio.nombre;
   formServicio.categoria = servicio.categoria;
   formServicio.precio_base = servicio.precio_base;
+  formServicio.comision_adicional = servicio.comision_adicional ?? 0;
   formServicio.duracion_min = servicio.duracion_min;
+  formServicio.es_recurrente = servicio.es_recurrente ?? true;
   formServicio.descripcion = servicio.descripcion;
   formServicio.especialistas = (servicio.especialistas || []).map((especialista) => especialista.id);
   formServicio.precios_especialistas = {};

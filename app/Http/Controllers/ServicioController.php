@@ -41,7 +41,9 @@ class ServicioController extends Controller
             'nombre' => 'required|string|max:255',
             'categoria' => 'required|string|max:100',
             'precio_base' => 'required|numeric|min:0',
+            'comision_adicional' => 'nullable|numeric|min:0',
             'duracion_min' => 'required|integer|min:5',
+            'es_recurrente' => 'nullable|boolean',
             'descripcion' => 'nullable|string',
             'especialistas' => 'nullable|array',
             'especialistas.*' => 'exists:users,id',
@@ -53,7 +55,9 @@ class ServicioController extends Controller
             'nombre' => $validated['nombre'],
             'categoria' => $validated['categoria'],
             'precio_base' => $validated['precio_base'],
+            'comision_adicional' => $validated['comision_adicional'] ?? 0,
             'duracion_min' => $validated['duracion_min'],
+            'es_recurrente' => (bool) ($validated['es_recurrente'] ?? true),
             'descripcion' => $validated['descripcion'] ?? null,
         ]);
 
@@ -79,7 +83,9 @@ class ServicioController extends Controller
             'nombre' => 'required|string|max:255',
             'categoria' => 'required|string|max:100',
             'precio_base' => 'required|numeric|min:0',
+            'comision_adicional' => 'nullable|numeric|min:0',
             'duracion_min' => 'required|integer|min:5',
+            'es_recurrente' => 'nullable|boolean',
             'descripcion' => 'nullable|string',
             'especialistas' => 'nullable|array',
             'especialistas.*' => 'exists:users,id',
@@ -91,7 +97,9 @@ class ServicioController extends Controller
             'nombre' => $validated['nombre'],
             'categoria' => $validated['categoria'],
             'precio_base' => $validated['precio_base'],
+            'comision_adicional' => $validated['comision_adicional'] ?? 0,
             'duracion_min' => $validated['duracion_min'],
+            'es_recurrente' => (bool) ($validated['es_recurrente'] ?? true),
             'descripcion' => $validated['descripcion'] ?? null,
         ]);
 

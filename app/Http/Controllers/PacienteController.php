@@ -18,6 +18,8 @@ class PacienteController extends Controller
 
     public function index(Request $request)
     {
+        abort_unless(auth()->user()?->role === 'admin', 403, 'No tienes permisos para ver pacientes.');
+
         $search = $request->input('search');
         $data = $this->pacienteService->getPacientesData($search);
 

@@ -6,9 +6,14 @@ use App\Models\Cita;
 use App\Models\Paciente;
 use App\Models\Servicio;
 use App\Models\User;
+use App\Services\TasaCambioService;
 
 class DashboardService
 {
+    public function __construct(private TasaCambioService $tasaCambioService)
+    {
+    }
+
     public function getDashboardData(): array
     {
         $hoy = now()->format('Y-m-d');
@@ -25,6 +30,7 @@ class DashboardService
                     'servicio' => $cita->servicios->pluck('nombre')->join(', ') ?: 'Sin servicio',
                     'especialista' => ($cita->especialista ? $cita->especialista->name : null) ?? 'Sin especialista',
                     'monto' => (float)($cita->monto_total ?? 0),
+                    'monto_bs' => (float)($cita->monto_total_bs ?? 0),
                     'duracion_min' => (int)($cita->duracion_total ?? 0),
                     'estado' => $cita->estado ?? 'Confirmado',
                     'cabina' => $cita->cabina ?? 'Sin cabina',
@@ -35,8 +41,10 @@ class DashboardService
             ->all();
 
         return [
+            'tasas' => $this->tasaCambioService->obtener(),
             'kpis' => [
                 'ingresos_mes' => (float) Cita::whereMonth('fecha', now()->month)->sum('monto_total'),
+                'ingresos_mes_bs' => (float) Cita::whereMonth('fecha', now()->month)->sum('monto_total_bs'),
                 'turnos_hoy' => Cita::whereDate('fecha', $hoy)->count(),
                 'pacientes_totales' => Paciente::count(),
                 'especialistas_activos' => User::where('role', 'especialista')->count(),

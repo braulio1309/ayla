@@ -22,8 +22,8 @@
     <nav class="navbar navbar-expand-lg navbar-ayla sticky-top py-2">
       <div class="container-fluid px-4">
         <Link class="navbar-brand d-flex align-items-center" href="/dashboard">
-          <div class="bg-ayla-cream rounded-circle p-2 me-2 d-flex align-items-center justify-content-center" style="width: 42px; height: 42px;">
-            <i class="bi bi-flower2 text-ayla-dark fs-4"></i>
+            <div class="bg-ayla-cream rounded-circle p-2 me-2 d-flex align-items-center justify-content-center overflow-hidden" style="width: 42px; height: 42px;">
+            <img src="/ayla/ayla-logo.png" alt="Ayla" class="w-100 h-100 object-fit-cover">
           </div>
           <div>
             <span class="brand-font fs-3 fw-bold text-ayla-dark lh-1 d-block">ayla</span>
@@ -144,17 +144,8 @@ const userRoleLabel = computed(() => {
 const isAdmin = computed(() => authUser.value?.role === 'admin');
 
 const cerrarSesion = () => {
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = route('logout');
+  const logoutUrl = window.location.pathname.replace(/\/[^/]*\/?$/, '/logout');
 
-  const csrf = document.createElement('input');
-  csrf.type = 'hidden';
-  csrf.name = '_token';
-  csrf.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-
-  form.appendChild(csrf);
-  document.body.appendChild(form);
-  form.submit();
+  router.post(logoutUrl);
 };
 </script>

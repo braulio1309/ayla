@@ -8,9 +8,14 @@
           <h2 class="brand-font fw-bold text-ayla-dark mb-0">Módulo de Finanzas & Auditoría Gerencial</h2>
           <p class="text-muted small mb-0">Desglose completo de ingresos filtrables por trabajador, servicio y fechas</p>
         </div>
-        <button class="btn btn-outline-secondary btn-sm bg-white rounded-3 px-3 py-2" @click="exportarPDF">
-          <i class="bi bi-download me-1"></i> Exportar Reporte PDF
-        </button>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-success btn-sm bg-white rounded-3 px-3 py-2" @click="exportarExcel">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Descargar Excel
+          </button>
+          <button class="btn btn-outline-secondary btn-sm bg-white rounded-3 px-3 py-2" @click="exportarPDF">
+            <i class="bi bi-download me-1"></i> Exportar Reporte PDF
+          </button>
+        </div>
       </div>
 
       <!-- Card de Filtros de Auditoría -->
@@ -56,6 +61,7 @@
           <div class="card-ayla p-4 bg-ayla-dark text-white h-100">
             <span class="small text-white-50 d-block mb-1">Ingresos Brutos Auditados</span>
             <h2 class="brand-font fw-bold mb-1">${{ kpis.ingresos_brutos.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}</h2>
+            <span class="d-block">Bs. {{ Number(kpis.ingresos_brutos_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 }) }}</span>
             <span class="small text-white-50">En el periodo seleccionado</span>
           </div>
         </div>
@@ -79,8 +85,14 @@
 
       <!-- Tabla de Auditoría Detallada por Especialista -->
       <div class="card-ayla p-4">
-        <h5 class="brand-font fw-bold text-ayla-dark mb-3">Auditoría Detallada por Especialista</h5>
-        <div class="table-responsive">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="brand-font fw-bold text-ayla-dark mb-0">Auditoría Detallada por Especialista</h5>
+          <button type="button" class="btn btn-sm btn-outline-secondary" @click="mostrarAuditoria = !mostrarAuditoria">
+            <i class="bi" :class="mostrarAuditoria ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+            {{ mostrarAuditoria ? 'Recoger' : 'Mostrar' }}
+          </button>
+        </div>
+        <div v-show="mostrarAuditoria" class="table-responsive">
           <table class="table table-ayla align-middle mb-0">
             <thead>
               <tr>
@@ -98,10 +110,50 @@
                 <td class="fw-bold text-ayla-dark">{{ item.especialista }}</td>
                 <td>{{ item.categoria }}</td>
                 <td>{{ item.citas_completadas }}</td>
-                <td class="fw-bold text-success">${{ item.ingreso_generado.toFixed(2) }}</td>
+                <td class="fw-bold text-success">${{ item.ingreso_generado.toFixed(2) }}<br><span class="small text-ayla-rose">Bs. {{ Number(item.ingreso_generado_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span></td>
                 <td class="fw-bold text-ayla-dark">${{ item.comision_especialista.toFixed(2) }}</td>
                 <td class="fw-bold text-primary">${{ item.ganancia_negocio.toFixed(2) }}</td>
                 <td>{{ item.aporte_porcentaje }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card-ayla p-4 mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <h5 class="brand-font fw-bold text-ayla-dark mb-0">Agendas detalladas</h5>
+          <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small">{{ agendas.length }} cita(s) encontradas</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" @click="mostrarAgendas = !mostrarAgendas">
+              <i class="bi" :class="mostrarAgendas ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+              {{ mostrarAgendas ? 'Recoger' : 'Mostrar' }}
+            </button>
+          </div>
+        </div>
+        <div v-show="mostrarAgendas" class="table-responsive">
+          <table class="table table-ayla align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Hora</th>
+                <th>Paciente</th>
+                <th>Servicio</th>
+                <th>Estado</th>
+                <th class="text-end">Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="agenda in agendas" :key="agenda.id">
+                <td>{{ agenda.fecha }}</td>
+                <td>{{ agenda.hora }}</td>
+                <td class="fw-bold text-ayla-dark">{{ agenda.paciente }}</td>
+                <td>{{ agenda.servicio }}</td>
+                <td><span class="badge bg-ayla-rose">{{ agenda.estado }}</span></td>
+                <td class="text-end fw-bold">${{ Number(agenda.monto).toFixed(2) }}<br><span class="small text-ayla-rose">Bs. {{ formatoBs(agenda.monto_bs) }}</span></td>
+              </tr>
+              <tr v-if="agendas.length === 0">
+                <td colspan="6" class="text-center py-4 text-muted">No hay agendas para los filtros seleccionados.</td>
               </tr>
             </tbody>
           </table>
@@ -115,12 +167,13 @@
 <script setup>
 import MainLayout from '../Layouts/MainLayout.vue';
 import { router } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
   filters: Object,
   kpis: Object,
   auditoria_especialistas: Array,
+  agendas: Array,
   especialistas_lista: Array,
   servicios_lista: Array
 });
@@ -130,6 +183,25 @@ const filterForm = ref({
   especialista_id: props.filters?.especialista_id || '',
   servicio_id: props.filters?.servicio_id || ''
 });
+
+const agendas = computed(() => props.agendas || []);
+const mostrarAuditoria = ref(true);
+const mostrarAgendas = ref(true);
+
+const formatoBs = (monto) => Number(monto || 0).toLocaleString('es-VE', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+});
+
+const exportarExcel = () => {
+  const parametros = new URLSearchParams({
+    periodo: filterForm.value.periodo || '',
+    especialista_id: filterForm.value.especialista_id || '',
+    servicio_id: filterForm.value.servicio_id || ''
+  });
+
+  window.location.href = `/reportes/exportar?${parametros.toString()}`;
+};
 
 const filtrarAuditoria = () => {
   router.get('/reportes', filterForm.value, {

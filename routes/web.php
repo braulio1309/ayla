@@ -14,9 +14,15 @@ use Inertia\Inertia;
 
 // Rutas protegidas (Requieren autenticación)
 Route::middleware(['auth'])->group(function () {
-    
-    // Dashboard principal
-    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/', function () {
+        if (auth()->user()?->role === 'especialista') {
+            return redirect()->route('especialista.panel');
+        }
+
+        return app(DashboardController::class)->index();
+    })->name('dashboard');
+    Route::post('/tasas-cambio', [DashboardController::class, 'actualizarTasas'])
+        ->name('tasas.update');
 
     // Módulo de Agenda y Turnos
     Route::get('/agenda', [AgendaController::class, 'index'])->name('agenda.index');
@@ -24,7 +30,11 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/agenda/{cita}', [AgendaController::class, 'update'])->name('agenda.update');
 
     // Módulo de Pacientes
-    Route::get('/pacientes', [PacienteController::class, 'index'])->name('pacientes.index');
+    Route::get('/pacientes', function () {
+        abort_unless(auth()->user()?->role === 'admin', 403, 'No tienes permisos para ver pacientes.');
+
+        return app(PacienteController::class)->index(request());
+    })->name('pacientes.index');
     Route::post('/pacientes', [PacienteController::class, 'store'])->name('pacientes.store');
 
     // Módulo de Servicios
@@ -40,6 +50,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Módulo de Reportes
     Route::get('/reportes', [ReporteController::class, 'index'])->name('reportes.index');
+    Route::get('/reportes/exportar', [ReporteController::class, 'exportar'])->name('reportes.exportar');
 
     // Perfil (Breeze)
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

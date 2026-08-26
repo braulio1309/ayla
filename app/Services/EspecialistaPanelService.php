@@ -22,9 +22,10 @@ class EspecialistaPanelService
             ->get();
 
         $totalGenerado = (float) $citas->sum('monto_total');
+        $totalGeneradoBs = (float) $citas->sum('monto_total_bs');
         $porcentajeComision = $usuario && $usuario->role === 'especialista' ? (float) ($usuario->comision ?? 0) : 0;
         $comisionTotal = round($totalGenerado * ($porcentajeComision / 100), 2);
-        $negocioTotal = round($totalGenerado - $comisionTotal, 2);
+        $comisionTotalBs = round($totalGeneradoBs * ($porcentajeComision / 100), 2);
 
         $nombreEspecialista = $usuario ? $usuario->name : 'Especialista';
         $especialidad = ($usuario && $usuario->role === 'especialista') ? 'Especialista' : 'Administrador';
@@ -36,8 +37,9 @@ class EspecialistaPanelService
                 'comision' => $porcentajeComision,
             ],
             'total_generado' => $totalGenerado,
+            'total_generado_bs' => $totalGeneradoBs,
             'comision_total' => $comisionTotal,
-            'negocio_total' => $negocioTotal,
+            'comision_total_bs' => $comisionTotalBs,
             'filters' => [
                 'fecha_inicio' => $fechaInicio,
                 'fecha_fin' => $fechaFin,
@@ -51,6 +53,7 @@ class EspecialistaPanelService
                     'paciente' => $paciente ?? 'Paciente no registrado',
                     'servicio' => $servicio ?: 'Atención General',
                     'monto' => (float) $cita->monto_total,
+                    'monto_bs' => (float) ($cita->monto_total_bs ?? 0),
                 ];
             })->values()->all(),
         ];

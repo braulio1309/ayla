@@ -7,6 +7,8 @@ use App\Models\Paciente;
 use App\Models\Servicio;
 use App\Models\User;
 use App\Services\AgendaService;
+use App\Services\MetaWhatsAppService;
+use App\Services\TasaCambioService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
@@ -17,10 +19,14 @@ use App\Notifications\NuevaCitaAsignada;
 class AgendaController extends Controller
 {
     protected $agendaService;
+    protected $metaWhatsAppService;
+    protected $tasaCambioService;
 
-    public function __construct(AgendaService $agendaService)
+    public function __construct(AgendaService $agendaService, MetaWhatsAppService $metaWhatsAppService, TasaCambioService $tasaCambioService)
     {
         $this->agendaService = $agendaService;
+        $this->metaWhatsAppService = $metaWhatsAppService;
+        $this->tasaCambioService = $tasaCambioService;
     }
 
     public function index(Request $request)
@@ -47,6 +53,8 @@ class AgendaController extends Controller
             'paciente_id' => 'required|exists:pacientes,id',
             'especialista_id' => 'required|exists:users,id',
             'servicios' => 'required|array|min:1',
+            'precios_servicios' => 'nullable|array',
+            'precios_servicios.*' => 'nullable|numeric|min:0',
             'fecha' => 'required|date',
             'hora_inicio' => 'required',
             'holgura_min' => 'required|numeric',
@@ -92,9 +100,19 @@ class AgendaController extends Controller
             }
         }
 
-        $precioTotal = $serviciosSeleccionados->sum(function ($servicio) use ($validated) {
-            return (float) $servicio->getPrecioParaEspecialista((int) $validated['especialista_id']);
+        $precioTotal = $serviciosSeleccionados->sum(function ($servicio) use ($validated, $request) {
+            $precioServicio = $servicio->getPrecioParaEspecialista((int) $validated['especialista_id']);
+            $precioManual = $request->input('precios_servicios.' . $servicio->id);
+            $precioFinal = (float) ($precioManual !== null && $precioManual !== '' ? $precioManual : $precioServicio);
+
+            $cantidadSesiones = max(1, (int) ($validated['cantidad_sesiones'] ?? 1));
+            $esRecurrente = (bool) ($servicio->es_recurrente ?? true);
+
+            return $esRecurrente ? $precioFinal : $precioFinal * $cantidadSesiones;
         });
+
+        $tasas = $this->tasaCambioService->obtener();
+        $montoTotalBs = round($precioTotal * (float) $tasas->dolar_bcv, 2);
 
         $citasCreadas = [];
         foreach ($fechasAgenda as $fechaCita) {
@@ -110,18 +128,28 @@ class AgendaController extends Controller
                 'hora_fin' => $horaFin->format('H:i:s'),
                 'holgura_min' => (int) $validated['holgura_min'],
                 'monto_total' => $precioTotal,
+                'tasa_dolar_bcv' => $tasas->dolar_bcv,
+                'tasa_euro_bcv' => $tasas->euro_bcv,
+                'monto_total_bs' => $montoTotalBs,
                 'estado' => $this->mapEstadoParaBaseDatos('Confirmado'),
                 'cabina' => null,
                 'observaciones' => count($fechasAgenda) > 1 ? 'Turno recurrente agendado desde la agenda.' : 'Cita creada desde la agenda',
             ]);
 
             foreach ($serviciosSeleccionados as $servicio) {
+                $precioManual = $request->input('precios_servicios.' . $servicio->id);
+                $precioMomento = $precioManual !== null && $precioManual !== ''
+                    ? (float) $precioManual
+                    : $servicio->getPrecioParaEspecialista((int) $validated['especialista_id']);
+
                 $cita->servicios()->attach($servicio->id, [
-                    'precio_momento' => (float) $servicio->getPrecioParaEspecialista((int) $validated['especialista_id']),
+                    'precio_momento' => $servicio->es_recurrente ? $precioMomento : $precioMomento,
+                    'monto_bs_momento' => round($precioMomento * (float) $tasas->dolar_bcv, 2),
                     'duracion_momento' => (int) ($servicio->duracion_min ?? 0),
                 ]);
             }
 
+            $this->metaWhatsAppService->sendCitaCreadaMessage($cita);
             $citasCreadas[] = $cita;
         }
 

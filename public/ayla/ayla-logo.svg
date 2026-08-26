@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 768 768" role="img" aria-labelledby="title desc">
+  <title id="title">Ayla Centro médico - Belleza &amp; Spa</title>
+  <desc id="desc">Logo de Ayla</desc>
+  <rect width="768" height="768" fill="#b5a596"/>
+  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+    <path stroke-width="10" d="M384 315c-37-23-64-59-64-99 0-38 27-70 64-91 37 21 64 53 64 91 0 40-27 76-64 99Z"/>
+    <path stroke-width="10" d="M376 315c-51 2-93-22-113-58-18-34-8-72 11-104 39 5 76 22 95 56 18 32 15 73 7 106Z"/>
+    <path stroke-width="10" d="M392 315c51 2 93-22 113-58 18-34 8-72-11-104-39 5-76 22-95 56-18 32-15 73-7 106Z"/>
+    <path stroke-width="10" d="M268 169c-8 46 23 83 67 99M500 169c8 46-23 83-67 99"/>
+    <path stroke-width="10" d="M384 315c-6 32 2 57 27 79M384 315c6 32-2 57-27 79"/>
+    <path stroke-width="10" d="M292 292c28 40 56 63 92 67 36-4 64-27 92-67"/>
+    <path stroke-width="10" d="M406 346v82"/>
+  </g>
+  <g fill="#fff" font-family="Georgia, serif" text-anchor="middle">
+    <text x="384" y="475" font-size="190" font-style="italic">ayla</text>
+  </g>
+  <text x="384" y="522" fill="#fff" font-family="Arial, sans-serif" font-size="27" text-anchor="middle">Centro médico - Belleza &amp; Spa</text>
+</svg>

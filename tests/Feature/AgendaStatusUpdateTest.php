@@ -52,4 +52,26 @@ class AgendaStatusUpdateTest extends TestCase
             'observaciones' => 'Paciente llegó puntual y se realizó valoración inicial.',
         ]);
     }
+
+    public function test_especialista_is_redirected_from_admin_dashboard(): void
+    {
+        $especialista = User::factory()->create([
+            'role' => 'especialista',
+        ]);
+
+        $response = $this->actingAs($especialista)->get('/');
+
+        $response->assertRedirect('/panel-especialista');
+    }
+
+    public function test_especialista_cannot_access_general_patient_list(): void
+    {
+        $especialista = User::factory()->create([
+            'role' => 'especialista',
+        ]);
+
+        $response = $this->actingAs($especialista)->get('/pacientes');
+
+        $response->assertStatus(403);
+    }
 }

@@ -20,6 +20,29 @@
         </div>
       </div>
 
+      <div v-if="isAdmin" class="card-ayla p-4 mb-4 border-ayla-rose">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+          <div>
+            <h5 class="brand-font fw-bold mb-1">Tasas de cambio BCV</h5>
+            <p class="text-muted small mb-0">Se guardan como histórico al agendar cada cita.</p>
+          </div>
+          <form class="row g-2 align-items-end" @submit.prevent="actualizarTasas">
+            <div class="col-auto">
+              <label class="form-label small mb-1">Dólar en Bs</label>
+              <input v-model.number="tasasForm.dolar_bcv" type="number" min="0.0001" step="0.0001" class="form-control" required>
+            </div>
+            <div class="col-auto">
+              <label class="form-label small mb-1">Euro en Bs</label>
+              <input v-model.number="tasasForm.euro_bcv" type="number" min="0.0001" step="0.0001" class="form-control" required>
+            </div>
+            <div class="col-auto">
+              <button class="btn btn-ayla-primary" type="submit">Guardar tasas</button>
+            </div>
+          </form>
+        </div>
+        <div class="small text-muted mt-2">Última actualización: {{ tasas?.actualizada_en || 'Consultando API...' }}</div>
+      </div>
+
       <!-- Tarjetas KPI -->
       <div class="row g-3 mb-4">
         <div class="col-md-3">
@@ -28,6 +51,7 @@
               <div>
                 <span class="text-muted small">Ingresos del Mes</span>
                 <h3 class="fw-bold text-ayla-dark mb-0">${{ kpis.ingresos_mes.toFixed(2) }}</h3>
+                <span class="text-ayla-rose small fw-medium">Bs. {{ Number(kpis.ingresos_mes_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
                 <span class="text-success small fw-medium"><i class="bi bi-arrow-up-right"></i> +14% vs mes anterior</span>
               </div>
               <div class="bg-ayla-cream p-3 rounded-circle text-ayla-dark">
@@ -110,7 +134,7 @@
                     <td>{{ c.paciente }}</td>
                     <td>{{ c.servicio }}</td>
                     <td>{{ c.especialista }}</td>
-                    <td><strong>${{ c.monto.toFixed(2) }}</strong></td>
+                    <td><strong>${{ c.monto.toFixed(2) }}</strong><br><span class="small text-ayla-rose">Bs. {{ Number(c.monto_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span></td>
                     <td>
                       <span class="badge" :class="{
                         'bg-success': c.estado === 'Completado',
@@ -353,10 +377,18 @@ const props = defineProps({
   citas_hoy: Array,
   pacientes_lista: Array,
   servicios_lista: Array,
-  especialistas_lista: Array
+  especialistas_lista: Array,
+  tasas: Object
 });
 
 const isAdmin = computed(() => usePage().props.auth?.user?.role === 'admin');
+const tasasForm = ref({
+  dolar_bcv: Number(props.tasas?.dolar_bcv || 0),
+  euro_bcv: Number(props.tasas?.euro_bcv || 0)
+});
+const actualizarTasas = () => {
+  useForm(tasasForm.value).post('/tasas-cambio');
+};
 
 // Cita seleccionada para ver en modal
 const citaSeleccionada = ref(null);

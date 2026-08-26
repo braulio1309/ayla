@@ -15,6 +15,7 @@
           <div class="text-end">
             <span class="text-muted small d-block">Tu comisión actual: {{ especialistaSegura.comision }}%</span>
             <h2 class="brand-font fw-bold text-ayla-dark mb-0">${{ comisionTotalSeguro.toFixed(2) }}</h2>
+            <span class="text-ayla-rose small">Bs. {{ formatoBs(comisionTotalBsSeguro) }}</span>
           </div>
         </div>
       </div>
@@ -22,14 +23,16 @@
       <div class="row g-3 mb-4">
         <div class="col-md-6">
           <div class="card-ayla p-4 h-100">
-            <span class="small text-muted d-block mb-2">Total generado</span>
+            <span class="small text-muted d-block mb-2">Mi total generado</span>
             <h3 class="brand-font fw-bold text-ayla-dark mb-0">${{ totalGeneradoSeguro.toFixed(2) }}</h3>
+            <span class="text-ayla-rose small">Bs. {{ formatoBs(totalGeneradoBsSeguro) }}</span>
           </div>
         </div>
         <div class="col-md-6">
           <div class="card-ayla p-4 h-100">
-            <span class="small text-muted d-block mb-2">Negocio</span>
-            <h3 class="brand-font fw-bold text-success mb-0">${{ negocioTotalSeguro.toFixed(2) }}</h3>
+            <span class="small text-muted d-block mb-2">Mi comisión</span>
+            <h3 class="brand-font fw-bold text-success mb-0">${{ comisionTotalSeguro.toFixed(2) }}</h3>
+            <span class="text-ayla-rose small">Bs. {{ formatoBs(comisionTotalBsSeguro) }}</span>
           </div>
         </div>
       </div>
@@ -71,7 +74,7 @@
                 <td>{{ a.fecha }}</td>
                 <td class="fw-bold text-ayla-dark">{{ a.paciente }}</td>
                 <td>{{ a.servicio }}</td>
-                <td class="text-end fw-bold text-success">${{ Number(a.monto ?? 0).toFixed(2) }}</td>
+                <td class="text-end fw-bold text-success">${{ Number(a.monto ?? 0).toFixed(2) }}<br><span class="small text-ayla-rose">Bs. {{ formatoBs(a.monto_bs) }}</span></td>
               </tr>
               <tr v-if="atencionesSeguras.length === 0">
                 <td colspan="4" class="text-center py-4 text-muted">
@@ -95,17 +98,24 @@ import { computed, ref } from 'vue';
 const props = defineProps({
   especialista: Object,
   total_generado: Number,
+  total_generado_bs: Number,
   comision_total: Number,
-  negocio_total: Number,
+  comision_total_bs: Number,
   atenciones: Array,
   filters: Object
 });
 
 const especialistaSegura = computed(() => props.especialista || { nombre: '', especialidad: '', comision: 0 });
 const totalGeneradoSeguro = computed(() => Number(props.total_generado ?? 0));
+const totalGeneradoBsSeguro = computed(() => Number(props.total_generado_bs ?? 0));
 const comisionTotalSeguro = computed(() => Number(props.comision_total ?? 0));
-const negocioTotalSeguro = computed(() => Number(props.negocio_total ?? 0));
+const comisionTotalBsSeguro = computed(() => Number(props.comision_total_bs ?? 0));
 const atencionesSeguras = computed(() => props.atenciones || []);
+
+const formatoBs = (monto) => Number(monto ?? 0).toLocaleString('es-VE', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 
 const filterForm = ref({
   fecha_inicio: props.filters?.fecha_inicio || '2026-08-01',

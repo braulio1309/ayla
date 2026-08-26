@@ -1,10 +1,10 @@
 <template>
-  <div class="bg-ayla-cream d-flex align-items-center justify-content-center min-vh-100 py-5">
-    <div class="card-ayla p-4 text-center shadow-lg border-0" style="max-width: 380px; width: 100%;">
+  <div class="bg-ayla-rose d-flex align-items-center justify-content-center min-vh-100 py-5">
+    <div class="card-ayla login-card-ayla p-4 text-center shadow-lg border-0" style="max-width: 380px; width: 100%;">
       <div v-if="statusMessage" :class="['alert py-2 mb-3 small', statusType === 'success' ? 'alert-success' : 'alert-danger']">
         {{ statusMessage }}
       </div>
-      <h1 class="brand-font fw-bold text-ayla-dark mb-0">ayla</h1>
+      <img src="/ayla/ayla-logo.png" alt="Ayla Centro médico - Belleza & Spa" class="img-fluid mb-3" style="max-height: 180px;">
       <p class="text-muted small mb-4">CENTRO MÉDICO • BELLEZA & SPA</p>
       <form @submit.prevent="submit">
         <div class="mb-3 text-start">

@@ -11,6 +11,10 @@ use Illuminate\Support\Facades\Auth;
 
 class AgendaService
 {
+    public function __construct(private TasaCambioService $tasaCambioService)
+    {
+    }
+
     public function getAgendaData(?string $fecha = null, ?int $especialistaId = null, ?string $estado = null): array
     {
         $fecha = $fecha ?: now()->format('Y-m-d');
@@ -49,6 +53,9 @@ class AgendaService
                 'especialista' => ($cita->especialista ? $cita->especialista->name : null) ?? 'Sin especialista',
                 'especialista_id' => $cita->user_id,
                 'monto' => (float) ($cita->monto_total ?? 0),
+                'monto_bs' => (float) ($cita->monto_total_bs ?? 0),
+                'tasa_dolar_bcv' => (float) ($cita->tasa_dolar_bcv ?? 0),
+                'tasa_euro_bcv' => (float) ($cita->tasa_euro_bcv ?? 0),
                 'cabina' => $cita->cabina ?? 'Sin cabina',
                 'estado' => $estadoTexto,
                 'observaciones' => $cita->observaciones ?? '',
@@ -63,6 +70,7 @@ class AgendaService
                 $query->where('users.id', $usuarioActual->id);
             }
         }])->get()->map(function ($s) use ($especialistaId, $usuarioActual) {
+            $tasaDolar = (float) $this->tasaCambioService->obtener()->dolar_bcv;
             $especialistaAsignado = $especialistaId
                 ? $s->especialistas->first()
                 : ($usuarioActual && $usuarioActual->role === 'especialista'
@@ -77,7 +85,9 @@ class AgendaService
                 'id' => $s->id,
                 'nombre' => $s->nombre,
                 'precio' => $precio,
+                'precio_bs' => round($precio * $tasaDolar, 2),
                 'duracion' => (int) ($s->duracion_min ?? 0),
+                'es_recurrente' => (bool) ($s->es_recurrente ?? true),
                 'especialistas' => $s->especialistas->map(fn ($u) => [
                     'id' => $u->id,
                     'name' => $u->name,

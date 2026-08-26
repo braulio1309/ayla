@@ -19,15 +19,25 @@ class Cita extends Model
         'hora_fin',
         'holgura_min',
         'monto_total',
+        'tasa_dolar_bcv',
+        'tasa_euro_bcv',
+        'monto_total_bs',
         'estado',
         'cabina',
         'observaciones',
+        'whatsapp_creacion_enviado_at',
+        'whatsapp_recordatorio_enviado_at',
     ];
 
     protected $casts = [
         'fecha' => 'date',
         'monto_total' => 'decimal:2',
+        'tasa_dolar_bcv' => 'decimal:4',
+        'tasa_euro_bcv' => 'decimal:4',
+        'monto_total_bs' => 'decimal:2',
         'holgura_min' => 'integer',
+        'whatsapp_creacion_enviado_at' => 'datetime',
+        'whatsapp_recordatorio_enviado_at' => 'datetime',
     ];
 
     public function paciente(): BelongsTo
@@ -43,7 +53,7 @@ class Cita extends Model
     public function servicios(): BelongsToMany
     {
         return $this->belongsToMany(Servicio::class, 'cita_servicio')
-                    ->withPivot('precio_momento', 'duracion_momento')
+                    ->withPivot('precio_momento', 'monto_bs_momento', 'duracion_momento')
                     ->withTimestamps();
     }
 }

@@ -109,6 +109,10 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   box-shadow: 0 4px 15px rgba(127, 111, 97, 0.05);
 }
 
+.login-card-ayla {
+  background-color: #f7e9e5;
+}
+
 /* Tablas Personalizadas (Ayla) */
 .table-ayla {
   border-collapse: separate;

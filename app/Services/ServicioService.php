@@ -28,13 +28,15 @@ class ServicioService
                 'nombre' => $s->nombre,
                 'categoria' => $s->categoria,
                 'precio_base' => (float) ($s->precio_base ?? 0),
+                'comision_adicional' => (float) ($s->comision_adicional ?? 0),
                 'duracion_min' => (int) ($s->duracion_min ?? 0),
+                'es_recurrente' => (bool) ($s->es_recurrente ?? true),
                 'descripcion' => $s->descripcion,
                 'especialistas' => $s->especialistas->map(function ($especialista) use ($s) {
                     return [
                         'id' => $especialista->id,
                         'name' => $especialista->name,
-                        'precio_especialista' => (float) ($especialista->pivot->precio_especialista ?? $s->precio_base ?? 0),
+                        'precio_especialista' => (float) ($especialista->pivot->precio_especialista ?? $s->precio_base ?? 0) + (float) ($s->comision_adicional ?? 0),
                     ];
                 })->values()->all(),
             ];
@@ -55,7 +57,17 @@ class ServicioService
                 'categoria' => $categoria,
             ],
             'servicios' => $servicios,
-            'categorias' => ['Cosmiatría', 'Masajes & Spa', 'Manos / Pies', 'Estética General'],
+            'categorias' => [
+                'Cosmiatría',
+                'Masajes & Spa',
+                'Manos / Pies',
+                'Estética General',
+                'Tratamientos especiales',
+                'Depilación láser',
+                'Servicios reductores/reafirmantes',
+                'Faciales',
+                'Corporales',
+            ],
             'especialistas' => $especialistas,
         ];
     }

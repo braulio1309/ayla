@@ -13,6 +13,9 @@ class ReporteService
         $periodo = $periodo ?: 'agosto_2026';
 
         $citas = Cita::with([
+            'paciente' => function ($query) {
+                $query->select('id', 'nombre');
+            },
             'especialista' => function ($query) {
                 $query->select('id', 'name', 'role', 'comision');
             },
@@ -33,6 +36,7 @@ class ReporteService
 
         $citas = $citas->get();
         $totalGeneral = (float) $citas->sum('monto_total');
+        $totalGeneralBs = (float) $citas->sum('monto_total_bs');
 
         $auditoria = $citas->groupBy('user_id')->map(function ($items) use ($totalGeneral) {
             $especialista = null;
@@ -41,6 +45,7 @@ class ReporteService
             }
 
             $total = (float) $items->sum('monto_total');
+            $totalBs = (float) $items->sum('monto_total_bs');
             $porcentajeComision = $especialista && $especialista->role === 'especialista' ? (float) ($especialista->comision ?? 0) : 0;
             $comisionEspecialista = round($total * ($porcentajeComision / 100), 2);
             $negocio = round($total - $comisionEspecialista, 2);
@@ -56,6 +61,7 @@ class ReporteService
                 'categoria' => $categoria,
                 'citas_completadas' => $items->count(),
                 'ingreso_generado' => round($total, 2),
+                'ingreso_generado_bs' => round($totalBs, 2),
                 'comision_especialista' => $comisionEspecialista,
                 'ganancia_negocio' => $negocio,
                 'aporte_porcentaje' => $porcentaje . '%',
@@ -65,6 +71,19 @@ class ReporteService
         $totalComisionEspecialistas = round(array_sum(array_column($auditoria, 'comision_especialista')), 2);
         $totalNegocio = round(array_sum(array_column($auditoria, 'ganancia_negocio')), 2);
 
+        $agendas = $citas->sortByDesc('fecha')->values()->map(function ($cita) {
+            return [
+                'id' => $cita->id,
+                'fecha' => $cita->fecha?->format('d/m/Y'),
+                'hora' => $cita->hora_inicio ? substr((string) $cita->hora_inicio, 0, 5) : 'N/A',
+                'paciente' => $cita->paciente?->nombre ?? 'Sin paciente',
+                'servicio' => $cita->servicios->pluck('nombre')->join(', ') ?: 'Sin servicio',
+                'estado' => $cita->estado,
+                'monto' => (float) ($cita->monto_total ?? 0),
+                'monto_bs' => (float) ($cita->monto_total_bs ?? 0),
+            ];
+        })->all();
+
         return [
             'filters' => [
                 'periodo' => $periodo,
@@ -73,6 +92,7 @@ class ReporteService
             ],
             'kpis' => [
                 'ingresos_brutos' => (float) $citas->sum('monto_total'),
+                'ingresos_brutos_bs' => $totalGeneralBs,
                 'total_comision_especialistas' => $totalComisionEspecialistas,
                 'total_negocio' => $totalNegocio,
                 'total_citas' => $citas->count(),
@@ -82,6 +102,7 @@ class ReporteService
                 'top_especialista_porcentaje' => $auditoria[0]['aporte_porcentaje'] ?? '0%',
             ],
             'auditoria_especialistas' => $auditoria,
+            'agendas' => $agendas,
             'especialistas_lista' => User::where('role', 'especialista')->select('id', 'name')->get()->map(fn ($u) => [
                 'id' => $u->id,
                 'nombre' => $u->name,

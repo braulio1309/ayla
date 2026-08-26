@@ -86,7 +86,7 @@
                   <div class="turno-card" :class="estadoClass(turno.estado)">
                     <div class="d-flex justify-content-between align-items-start gap-2">
                       <strong>{{ turno.paciente }}</strong>
-                      <span class="badge bg-ayla-dark">${{ turno.monto.toFixed(2) }}</span>
+                      <span class="badge bg-ayla-dark">${{ turno.monto.toFixed(2) }}<br>Bs. {{ Number(turno.monto_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
                     </div>
                     <div class="small text-muted mt-1"><i class="bi bi-clock me-1"></i> {{ turno.hora_inicio }} - {{ turno.hora_fin }} ({{ turno.duracion_min }} min)</div>
                     <div class="small fw-medium text-ayla-dark">{{ turno.servicio }}</div>
@@ -218,12 +218,31 @@
                     <span class="text-muted small">Seleccione uno o varios</span>
                   </label>
                   <div v-if="serviciosState.length" class="card p-3 bg-light border">
-                    <div v-for="s in serviciosState" :key="s.id" class="form-check mb-2">
+                    <div v-for="s in serviciosState" :key="s.id" class="form-check mb-3">
                       <input class="form-check-input" type="checkbox" :id="'srv-agenda-'+s.id" v-model="s.selected">
                       <label class="form-check-label d-flex justify-content-between w-100" :for="'srv-agenda-'+s.id">
                         <span>{{ s.nombre }} ({{ s.duracion }} min)</span>
-                        <strong class="text-ayla-dark">${{ s.precio.toFixed(2) }}</strong>
+                        <strong class="text-ayla-dark">${{ s.precio.toFixed(2) }}<br><span class="small text-ayla-rose">Bs. {{ Number(s.precio_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span></strong>
                       </label>
+
+                      <div v-if="s.selected" class="mt-2 ms-4">
+                        <div class="row g-2 align-items-center">
+                          <div class="col-8">
+                            <label class="form-label small text-muted mb-1">Precio manual</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              class="form-control form-control-sm"
+                              :value="formTurno.precios_servicios[s.id] ?? s.precio"
+                              @input="formTurno.precios_servicios[s.id] = Number($event.target.value) || 0"
+                            >
+                          </div>
+                          <div class="col-4 d-flex align-items-end">
+                            <small class="text-muted">${{ Number(formTurno.precios_servicios[s.id] ?? s.precio).toFixed(2) }}</small>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <div v-else class="alert alert-warning small mb-0">
@@ -254,6 +273,7 @@
                   <label class="form-label fw-medium">Recurrencia del turno</label>
                   <select class="form-select" v-model="formTurno.recurrencia">
                     <option value="ninguna">Sin recurrencia</option>
+                    <option value="diario">Diario</option>
                     <option value="semanal">Cada semana</option>
                     <option value="quincenal">Quincenal (cada 2 semanas)</option>
                     <option value="mensual">Mensual</option>
@@ -288,10 +308,11 @@
                     <strong class="fs-5 text-ayla-dark">{{ duracionTotal }} min</strong>
                   </div>
                   <div class="text-end">
-                      <span class="text-muted small d-block">Monto por sesión:</span>
-                      <strong class="fs-6 text-ayla-dark">${{ precioSesion.toFixed(2) }}</strong>
+                      <span class="text-muted small d-block">{{ tieneServicioRecurrente ? 'Precio del paquete:' : 'Monto por sesión:' }}</span>
+                      <strong class="fs-6 text-ayla-dark">${{ precioResumen.toFixed(2) }}</strong>
                       <span class="text-muted small d-block mt-1">Total a pagar por {{ sesionesSeleccionadas }} sesión{{ sesionesSeleccionadas === 1 ? '' : 'es' }}:</span>
                     <strong class="fs-4 text-ayla-dark">${{ precioTotal.toFixed(2) }}</strong>
+                    <span class="text-ayla-rose small d-block">Bs. {{ precioTotalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
                   </div>
                 </div>
               </div>
@@ -337,7 +358,7 @@
               </li>
               <li class="list-group-item d-flex justify-content-between">
                 <span class="text-muted">Monto Total:</span>
-                <strong class="text-success">${{ citaSeleccionada.monto.toFixed(2) }}</strong>
+                <strong class="text-success">${{ citaSeleccionada.monto.toFixed(2) }}<br><span class="small text-ayla-rose">Bs. {{ Number(citaSeleccionada.monto_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span></strong>
               </li>
               <li class="list-group-item d-flex justify-content-between align-items-center">
                 <span class="text-muted">Estado Actual:</span>
@@ -671,12 +692,13 @@ const formTurno = useForm({
   paciente_id: '',
   especialista_id: isSpecialist.value ? (authUser.value?.id || '') : '',
   servicios: [],
+  precios_servicios: {},
   fecha: props.filters.fecha || new Date().toISOString().substr(0, 10),
   hora_inicio: '08:00',
   holgura_min: 15,
-  recurrencia: 'ninguna',
+  recurrencia: 'mensual',
   dias_semana: [],
-  cantidad_sesiones: 1
+  cantidad_sesiones: 3
 });
 
 const serviciosDisponibles = computed(() => {
@@ -714,12 +736,31 @@ const duracionTotal = computed(() => {
   return min > 0 ? min + Number(formTurno.holgura_min) : 0;
 });
 
-const precioTotal = computed(() => {
-  return precioSesion.value * sesionesSeleccionadas.value;
+const tieneServicioRecurrente = computed(() => {
+  return serviciosState.value.some(s => s.selected && s.es_recurrente === true);
 });
 
-const precioSesion = computed(() => {
-  return serviciosState.value.filter(s => s.selected).reduce((acc, s) => acc + s.precio, 0);
+const precioTotal = computed(() => {
+  return serviciosState.value.filter(s => s.selected).reduce((acc, s) => {
+    const precioBase = Number(formTurno.precios_servicios?.[s.id] ?? s.precio ?? 0);
+    const valorServicio = s.es_recurrente === true ? precioBase : precioBase * sesionesSeleccionadas.value;
+    return acc + valorServicio;
+  }, 0);
+});
+
+const precioTotalBs = computed(() => {
+  return serviciosState.value.filter(s => s.selected).reduce((acc, s) => {
+    const precioBase = Number(formTurno.precios_servicios?.[s.id] ?? s.precio ?? 0);
+    const valorServicio = s.es_recurrente === true ? precioBase : precioBase * sesionesSeleccionadas.value;
+    return acc + valorServicio * Number(s.precio_bs || 0) / Number(s.precio || 1);
+  }, 0);
+});
+
+const precioResumen = computed(() => {
+  return serviciosState.value.filter(s => s.selected).reduce((acc, s) => {
+    const precioBase = Number(formTurno.precios_servicios?.[s.id] ?? s.precio ?? 0);
+    return acc + (s.es_recurrente === true ? precioBase : precioBase);
+  }, 0);
 });
 
 const sesionesSeleccionadas = computed(() => {
@@ -749,6 +790,12 @@ const resetServicios = () => {
 
 const guardarTurno = () => {
   formTurno.servicios = serviciosState.value.filter(s => s.selected).map(s => s.id);
+  formTurno.precios_servicios = Object.fromEntries(
+    serviciosState.value
+      .filter(s => s.selected)
+      .map(s => [s.id, Number(formTurno.precios_servicios?.[s.id] ?? s.precio ?? 0)])
+  );
+
   if (formTurno.recurrencia === 'ninguna') {
     formTurno.dias_semana = [];
     formTurno.cantidad_sesiones = 1;
@@ -765,9 +812,12 @@ const guardarTurno = () => {
       const modalEl = document.getElementById('modalNuevoTurno');
       const modal = bootstrap.Modal.getInstance(modalEl);
       if (modal) modal.hide();
-      formTurno.reset();      formTurno.fecha = localDateKey(new Date());      formTurno.recurrencia = 'ninguna';
+      formTurno.reset();
+      formTurno.fecha = localDateKey(new Date());
+      formTurno.recurrencia = 'mensual';
       formTurno.dias_semana = [];
-      formTurno.cantidad_sesiones = 1;
+      formTurno.cantidad_sesiones = 3;
+      formTurno.precios_servicios = {};
       resetServicios();
     }
   });

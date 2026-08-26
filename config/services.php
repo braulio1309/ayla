@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    'meta_whatsapp' => [
+        'token' => env('META_WHATSAPP_TOKEN'),
+        'phone_number_id' => env('META_WHATSAPP_PHONE_NUMBER_ID'),
+        'country_code' => env('META_WHATSAPP_COUNTRY_CODE', '57'),
+        'reminder_window_minutes' => env('META_WHATSAPP_REMINDER_WINDOW_MINUTES', 1440),
+        'reminder_margin_minutes' => env('META_WHATSAPP_REMINDER_MARGIN_MINUTES', 15),
+        'reminder_repeat_minutes' => env('META_WHATSAPP_REMINDER_REPEAT_MINUTES', 180),
+    ],
+
 ];

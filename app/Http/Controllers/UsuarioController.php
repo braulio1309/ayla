@@ -127,8 +127,9 @@ class UsuarioController extends Controller
         return Inertia::render('PanelEspecialista', [
             'especialista' => $data['especialista'],
             'total_generado' => $data['total_generado'] ?? 0,
+            'total_generado_bs' => $data['total_generado_bs'] ?? 0,
             'comision_total' => $data['comision_total'] ?? 0,
-            'negocio_total' => $data['negocio_total'] ?? 0,
+            'comision_total_bs' => $data['comision_total_bs'] ?? 0,
             'filters' => $data['filters'],
             'atenciones' => $data['atenciones'] ?? [],
         ]);
