@@ -23,17 +23,20 @@
       <div class="row g-3 mb-4">
         <div class="col-md-6">
           <div class="card-ayla p-4 h-100">
-            <span class="small text-muted d-block mb-2">Mi total generado</span>
+            <span class="small text-muted d-block mb-2">Mi total generado en servicios</span>
             <h3 class="brand-font fw-bold text-ayla-dark mb-0">${{ totalGeneradoSeguro.toFixed(2) }}</h3>
             <span class="text-ayla-rose small">Bs. {{ formatoBs(totalGeneradoBsSeguro) }}</span>
           </div>
         </div>
         <div class="col-md-6">
           <div class="card-ayla p-4 h-100">
-            <span class="small text-muted d-block mb-2">Mi comisión</span>
-            <h3 class="brand-font fw-bold text-success mb-0">${{ comisionTotalSeguro.toFixed(2) }}</h3>
-            <span class="text-ayla-rose small">Bs. {{ formatoBs(comisionTotalBsSeguro) }}</span>
-            <span class="text-muted small d-block mt-2">Por asistencias: ${{ Number(props.comision_asistente || 0).toFixed(2) }} / Bs. {{ formatoBs(props.comision_asistente_bs) }}</span>
+            <span class="small text-muted d-block mb-2">Mi comisión total ganada</span>
+            <h3 class="brand-font fw-bold text-success mb-0">${{ (comisionTotalSeguro + comisionAsistenteSeguro).toFixed(2) }}</h3>
+            <span class="text-ayla-rose small">Bs. {{ formatoBs(comisionTotalBsSeguro + comisionAsistenteBsSeguro) }}</span>
+            <div class="small text-muted mt-2 border-top pt-2 d-flex justify-content-between">
+              <span>Por servicios: <strong>${{ comisionTotalSeguro.toFixed(2) }}</strong> (Bs. {{ formatoBs(comisionTotalBsSeguro) }})</span>
+              <span v-if="comisionAsistenteSeguro > 0" class="text-ayla-dark">Por asistencias: <strong>${{ comisionAsistenteSeguro.toFixed(2) }}</strong> (Bs. {{ formatoBs(comisionAsistenteBsSeguro) }})</span>
+            </div>
           </div>
         </div>
       </div>
@@ -49,9 +52,14 @@
             <label class="form-label small text-muted mb-1">Fecha Fin</label>
             <input type="date" class="form-control" v-model="filterForm.fecha_fin">
           </div>
-          <div class="col-md-4 align-self-end">
+          <div class="col-md-2 align-self-end">
+            <button type="button" class="btn btn-outline-secondary w-100 py-2" @click="verHoy">
+              <i class="bi bi-calendar-day me-1"></i> Hoy
+            </button>
+          </div>
+          <div class="col-md-2 align-self-end">
             <button type="submit" class="btn btn-ayla-secondary w-100 py-2">
-              <i class="bi bi-filter me-1"></i> Consultar Producción
+              <i class="bi bi-filter me-1"></i> Filtrar
             </button>
           </div>
         </form>
@@ -66,24 +74,52 @@
               <tr>
                 <th>Fecha</th>
                 <th>Paciente Atendido</th>
-                <th>Servicios Realizados</th>
-                <th>Participación</th>
-                <th class="text-end">Monto Generado</th>
+                <th>Desglose de Servicios / Asistencia</th>
+                <th>Rol</th>
+                <th class="text-end">Monto Total Cita</th>
+                <th class="text-end">Mi Ganancia Total</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(a, index) in atencionesSeguras" :key="index">
                 <td>{{ a.fecha }}</td>
                 <td class="fw-bold text-ayla-dark">{{ a.paciente }}</td>
-                <td>{{ a.servicio }}</td>
                 <td>
-                  <span v-if="a.es_asistente" class="badge bg-ayla-rose">Asistente (3%)</span>
-                  <span v-else class="badge bg-ayla-dark">Principal</span>
+                  <div v-if="a.servicios_detalle && a.servicios_detalle.length" class="small">
+                    <div v-for="s in a.servicios_detalle" :key="'s-'+s.id" class="border-bottom py-1">
+                      <div class="d-flex justify-content-between gap-2">
+                        <strong>{{ s.nombre }}:</strong>
+                        <span class="text-muted">Total: ${{ Number(s.monto_total || 0).toFixed(2) }} (Bs. {{ formatoBs(s.monto_total_bs) }})</span>
+                      </div>
+                      <div v-if="s.es_mi_servicio" class="text-success fw-medium">
+                        Mi ganancia ({{ Number(s.comision_porcentaje || 0).toFixed(2) }}%): ${{ Number(s.mi_ganancia || 0).toFixed(2) }} (Bs. {{ formatoBs(s.mi_ganancia_bs) }})
+                      </div>
+                    </div>
+                  </div>
+                  <div v-else class="small text-muted">{{ a.servicio }}</div>
+
+                  <div v-if="a.es_asistente" class="mt-1 text-ayla-dark fw-medium small">
+                    <i class="bi bi-person-badge me-1"></i>Ganancia por asistencia ({{ Number(a.comision_asistente_porcentaje || 0).toFixed(2) }}%):
+                    <span class="text-success fw-bold">+${{ Number(a.ganancia_asistente || 0).toFixed(2) }} (Bs. {{ formatoBs(a.ganancia_asistente_bs) }})</span>
+                  </div>
                 </td>
-                <td class="text-end fw-bold text-success">${{ Number(a.monto ?? 0).toFixed(2) }}<br><span class="small text-ayla-rose">Bs. {{ formatoBs(a.monto_bs) }}</span></td>
+                <td>
+                  <div class="d-flex flex-column gap-1 align-items-start">
+                    <span v-if="a.es_principal || a.ganancia_servicios > 0" class="badge bg-ayla-dark">Especialista</span>
+                    <span v-if="a.es_asistente" class="badge bg-ayla-rose">Asistente ({{ Number(a.comision_asistente_porcentaje || 0).toFixed(2) }}%)</span>
+                  </div>
+                </td>
+                <td class="text-end fw-medium text-dark">
+                  ${{ Number(a.monto ?? 0).toFixed(2) }}
+                  <br><span class="small text-ayla-rose">Bs. {{ formatoBs(a.monto_bs) }}</span>
+                </td>
+                <td class="text-end fw-bold text-success fs-6">
+                  ${{ Number(a.mi_ganancia_total ?? (a.ganancia_servicios + a.ganancia_asistente) ?? 0).toFixed(2) }}
+                  <br><span class="small text-ayla-rose fw-normal">Bs. {{ formatoBs(a.mi_ganancia_total_bs) }}</span>
+                </td>
               </tr>
               <tr v-if="atencionesSeguras.length === 0">
-                <td colspan="5" class="text-center py-4 text-muted">
+                <td colspan="6" class="text-center py-4 text-muted">
                   No se registraron atenciones en el intervalo de fechas seleccionado.
                 </td>
               </tr>
@@ -126,12 +162,28 @@ const formatoBs = (monto) => Number(monto ?? 0).toLocaleString('es-VE', {
 });
 
 const filterForm = ref({
-  fecha_inicio: props.filters?.fecha_inicio || '2026-08-01',
-  fecha_fin: props.filters?.fecha_fin || '2026-08-31'
+  fecha: props.filters?.fecha || new Date().toISOString().substr(0, 10),
+  fecha_inicio: props.filters?.fecha_inicio || new Date().toISOString().substr(0, 10),
+  fecha_fin: props.filters?.fecha_fin || new Date().toISOString().substr(0, 10)
 });
 
+const verHoy = () => {
+  const hoy = new Date().toISOString().substr(0, 10);
+  filterForm.value.fecha = hoy;
+  filterForm.value.fecha_inicio = hoy;
+  filterForm.value.fecha_fin = hoy;
+  consultarProduccion();
+};
+
 const consultarProduccion = () => {
-  router.get('/panel-especialista', filterForm.value, {
+  const payload = {
+    ...filterForm.value,
+    fecha_inicio: filterForm.value.fecha_inicio || filterForm.value.fecha,
+    fecha_fin: filterForm.value.fecha_fin || filterForm.value.fecha,
+    fecha: filterForm.value.fecha || filterForm.value.fecha_inicio,
+  };
+
+  router.get('/panel-especialista', payload, {
     preserveState: true,
     replace: true
   });

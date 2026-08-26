@@ -67,14 +67,23 @@
               <span class="small text-muted fw-medium">
                 <i class="bi bi-clock me-1 text-ayla-rose"></i> {{ s.duracion_min }} Minutos
               </span>
-              <button v-if="isAdmin"
-                class="btn btn-sm btn-ayla-outline" 
-                @click="abrirModalEditar(s)"
-                data-bs-toggle="modal" 
-                data-bs-target="#modalServicio"
-              >
-                <i class="bi bi-pencil me-1"></i> Editar
-              </button>
+              <div v-if="isAdmin" class="d-flex gap-1">
+                <button
+                  class="btn btn-sm btn-ayla-outline" 
+                  @click="abrirModalEditar(s)"
+                  data-bs-toggle="modal" 
+                  data-bs-target="#modalServicio"
+                >
+                  <i class="bi bi-pencil me-1"></i> Editar
+                </button>
+                <button
+                  class="btn btn-sm btn-outline-danger" 
+                  @click="eliminarServicio(s)"
+                  title="Eliminar Servicio"
+                >
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -173,11 +182,16 @@
                 </div>
               </div>
             </div>
-            <div class="modal-footer border-top">
-              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-              <button type="submit" class="btn btn-ayla-primary px-4" :disabled="formServicio.processing">
-                {{ modoEdicion ? 'Actualizar Servicio' : 'Guardar Servicio' }}
+            <div class="modal-footer border-top d-flex justify-content-between">
+              <button v-if="modoEdicion && isAdmin" type="button" class="btn btn-outline-danger" @click="eliminarServicioActual">
+                <i class="bi bi-trash me-1"></i> Eliminar Servicio
               </button>
+              <div class="d-flex gap-2 ms-auto">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-ayla-primary px-4" :disabled="formServicio.processing">
+                  {{ modoEdicion ? 'Actualizar Servicio' : 'Guardar Servicio' }}
+                </button>
+              </div>
             </div>
           </form>
         </div>
@@ -292,6 +306,22 @@ const cerrarModal = () => {
   formServicio.reset();
   formServicio.especialistas = [];
   formServicio.precios_especialistas = {};
+};
+
+const eliminarServicio = (servicio) => {
+  if (!servicio || !servicio.id) return;
+  if (confirm(`¿Estás seguro de que deseas eliminar el servicio "${servicio.nombre}"?`)) {
+    router.delete('/servicios/' + servicio.id, {
+      preserveScroll: true,
+      onSuccess: () => cerrarModal()
+    });
+  }
+};
+
+const eliminarServicioActual = () => {
+  if (!servicioIdActual.value) return;
+  const servicio = props.servicios.find(s => s.id === servicioIdActual.value);
+  eliminarServicio(servicio || { id: servicioIdActual.value, nombre: formServicio.nombre });
 };
 
 const obtenerBadgeCategoria = (categoria) => {

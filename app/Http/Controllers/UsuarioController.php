@@ -119,10 +119,11 @@ class UsuarioController extends Controller
      */
     public function especialistaPanel(Request $request)
     {
-        $fechaInicio = $request->input('fecha_inicio');
-        $fechaFin = $request->input('fecha_fin');
+        $fecha = $request->input('fecha');
+        $fechaInicio = $request->input('fecha_inicio') ?: ($fecha ?: now()->startOfMonth()->format('Y-m-d'));
+        $fechaFin = $request->input('fecha_fin') ?: ($fecha ?: now()->endOfMonth()->format('Y-m-d'));
 
-        $data = $this->especialistaPanelService->getPanelData($fechaInicio, $fechaFin);
+        $data = $this->especialistaPanelService->getPanelData($fechaInicio, $fechaFin, $fecha);
 
         return Inertia::render('PanelEspecialista', [
             'especialista' => $data['especialista'],
@@ -132,7 +133,11 @@ class UsuarioController extends Controller
             'comision_total_bs' => $data['comision_total_bs'] ?? 0,
             'comision_asistente' => $data['comision_asistente'] ?? 0,
             'comision_asistente_bs' => $data['comision_asistente_bs'] ?? 0,
-            'filters' => $data['filters'],
+            'filters' => [
+                'fecha' => $fecha ?: $fechaInicio,
+                'fecha_inicio' => $fechaInicio,
+                'fecha_fin' => $fechaFin,
+            ],
             'atenciones' => $data['atenciones'] ?? [],
         ]);
     }

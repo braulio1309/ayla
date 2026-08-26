@@ -61,7 +61,7 @@ class Cita extends Model
     public function servicios(): BelongsToMany
     {
         return $this->belongsToMany(Servicio::class, 'cita_servicio')
-                    ->withPivot('precio_momento', 'monto_bs_momento', 'duracion_momento')
+                    ->withPivot('precio_momento', 'monto_bs_momento', 'duracion_momento', 'especialista_id', 'comision_momento')
                     ->withTimestamps();
     }
 }

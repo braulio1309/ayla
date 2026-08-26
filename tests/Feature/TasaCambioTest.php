@@ -37,4 +37,28 @@ class TasaCambioTest extends TestCase
             'euro_bcv' => 916.0267,
         ]);
     }
+
+    public function test_los_servicios_se_muestran_en_bs_con_la_tasa_del_euro(): void
+    {
+        TasaCambio::create([
+            'dolar_bcv' => 150.1235,
+            'euro_bcv' => 916.0267,
+            'actualizada_en' => now(),
+        ]);
+
+        $servicio = \App\Models\Servicio::create([
+            'nombre' => 'Consulta',
+            'categoria' => 'General',
+            'precio_base' => 50,
+            'duracion_min' => 30,
+            'descripcion' => 'Consulta general',
+            'es_recurrente' => true,
+        ]);
+
+        $data = app(\App\Services\AgendaService::class)->getAgendaData();
+        $servicioAgenda = collect($data['servicios_lista'])->firstWhere('id', $servicio->id);
+
+        $this->assertNotNull($servicioAgenda);
+        $this->assertSame(45801.34, (float) $servicioAgenda['precio_bs']);
+    }
 }

@@ -41,6 +41,40 @@ class AgendaService
 
             $estadoTexto = $this->normalizarEstado($cita->estado);
 
+            $subtotalServicios = (float) $cita->servicios->sum('pivot.precio_momento');
+            if ($subtotalServicios <= 0) $subtotalServicios = (float) $cita->monto_total;
+
+            $subtotalServiciosBs = (float) $cita->servicios->sum('pivot.monto_bs_momento');
+            if ($subtotalServiciosBs <= 0) $subtotalServiciosBs = (float) $cita->monto_total_bs;
+
+            $montoAsistente = $cita->asistente_id
+                ? round($subtotalServicios * (((float) ($cita->comision_asistente_porcentaje ?? 0)) / 100), 2)
+                : 0;
+
+            $montoAsistenteBs = $cita->asistente_id
+                ? round($subtotalServiciosBs * (((float) ($cita->comision_asistente_porcentaje ?? 0)) / 100), 2)
+                : 0;
+
+            $serviciosDetalle = $cita->servicios->map(function ($servicio) use ($cita) {
+                $espId = (int) ($servicio->pivot->especialista_id ?: $cita->user_id);
+                $espNombre = $espId === (int) $cita->user_id ? ($cita->especialista?->name ?? 'Especialista') : (User::find($espId)?->name ?? 'Especialista');
+                $precio = (float) ($servicio->pivot->precio_momento ?? 0);
+                $precioBs = (float) ($servicio->pivot->monto_bs_momento ?? 0);
+                $comisionPct = (float) ($servicio->pivot->comision_momento ?? 0);
+
+                return [
+                    'id' => $servicio->id,
+                    'nombre' => $servicio->nombre,
+                    'precio' => $precio,
+                    'precio_bs' => $precioBs,
+                    'especialista_id' => $espId,
+                    'especialista_nombre' => $espNombre,
+                    'comision_porcentaje' => $comisionPct,
+                    'ganancia' => round($precio * ($comisionPct / 100), 2),
+                    'ganancia_bs' => round($precioBs * ($comisionPct / 100), 2),
+                ];
+            })->values()->all();
+
             return [
                 'id' => $cita->id,
                 'hora_inicio' => $cita->hora_inicio ? Carbon::parse($cita->hora_inicio)->format('h:i A') : '',
@@ -50,11 +84,14 @@ class AgendaService
                 'paciente_id' => $cita->paciente_id,
                 'servicio_ids' => $cita->servicios->pluck('id')->values()->all(),
                 'servicio' => $cita->servicios->pluck('nombre')->join(', ') ?: 'Sin servicio',
+                'servicios_detalle' => $serviciosDetalle,
                 'especialista' => ($cita->especialista ? $cita->especialista->name : null) ?? 'Sin especialista',
                 'especialista_id' => $cita->user_id,
                 'asistente' => $cita->asistente?->name,
                 'asistente_id' => $cita->asistente_id,
                 'comision_asistente_porcentaje' => (float) ($cita->comision_asistente_porcentaje ?? 0),
+                'monto_asistente' => $montoAsistente,
+                'monto_asistente_bs' => $montoAsistenteBs,
                 'monto' => (float) ($cita->monto_total ?? 0),
                 'monto_bs' => (float) ($cita->monto_total_bs ?? 0),
                 'tasa_dolar_bcv' => (float) ($cita->tasa_dolar_bcv ?? 0),
@@ -73,7 +110,7 @@ class AgendaService
                 $query->where('users.id', $usuarioActual->id);
             }
         }])->get()->map(function ($s) use ($especialistaId, $usuarioActual) {
-            $tasaDolar = (float) $this->tasaCambioService->obtener()->dolar_bcv;
+            $tasaEuro = (float) $this->tasaCambioService->obtener()->euro_bcv;
             $especialistaAsignado = $especialistaId
                 ? $s->especialistas->first()
                 : ($usuarioActual && $usuarioActual->role === 'especialista'
@@ -88,7 +125,7 @@ class AgendaService
                 'id' => $s->id,
                 'nombre' => $s->nombre,
                 'precio' => $precio,
-                'precio_bs' => round($precio * $tasaDolar, 2),
+                'precio_bs' => round($precio * $tasaEuro, 2),
                 'duracion' => (int) ($s->duracion_min ?? 0),
                 'es_recurrente' => (bool) ($s->es_recurrente ?? true),
                 'especialistas' => $s->especialistas->map(fn ($u) => [
@@ -113,9 +150,10 @@ class AgendaService
                 'cedula' => $p->cedula,
             ])->all(),
             'servicios_lista' => $serviciosLista,
-            'especialistas_lista' => User::where('role', 'especialista')->select('id', 'name')->get()->map(fn ($u) => [
+            'especialistas_lista' => User::where('role', 'especialista')->select('id', 'name', 'comision')->get()->map(fn ($u) => [
                 'id' => $u->id,
                 'name' => $u->name,
+                'comision' => (float) ($u->comision ?? 0),
             ])->all(),
         ];
     }

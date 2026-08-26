@@ -102,6 +102,9 @@
                         <button v-if="isAdmin" class="btn btn-sm btn-ayla-outline py-0 px-2" @click="abrirEdicionCita(turno)" data-bs-toggle="modal" data-bs-target="#modalEditarCita">
                           <i class="bi bi-pencil"></i> Modificar
                         </button>
+                        <button v-if="isAdmin" class="btn btn-sm btn-outline-danger py-0 px-2" @click="eliminarCita(turno.id)" title="Eliminar cita">
+                          <i class="bi bi-trash"></i>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -167,9 +170,14 @@
                   </div>
                   <div class="small text-muted mt-1">{{ turno.hora_inicio }} - {{ turno.hora_fin }}</div>
                   <div class="small text-ayla-dark">{{ turno.servicio }}</div>
-                  <button v-if="isAdmin" class="btn btn-sm btn-ayla-outline mt-2" @click="abrirEdicionCita(turno)" data-bs-toggle="modal" data-bs-target="#modalEditarCita">
-                    <i class="bi bi-pencil me-1"></i> Modificar cita
-                  </button>
+                  <div v-if="isAdmin" class="d-flex gap-2 mt-2">
+                    <button class="btn btn-sm btn-ayla-outline" @click="abrirEdicionCita(turno)" data-bs-toggle="modal" data-bs-target="#modalEditarCita">
+                      <i class="bi bi-pencil me-1"></i> Modificar
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" @click="eliminarCita(turno.id)">
+                      <i class="bi bi-trash me-1"></i> Eliminar
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -198,20 +206,36 @@
                   </select>
                 </div>
 
-                <div class="col-md-6">
-                  <label class="form-label fw-medium">Especialista Asignado</label>
+                <div class="col-md-5">
+                  <label class="form-label fw-medium">Especialista principal</label>
+                  <input v-model="busquedaEspecialista" type="text" class="form-control form-control-sm mb-2" placeholder="Buscar especialista..." :disabled="isSpecialist">
                   <select class="form-select" v-model="formTurno.especialista_id" :disabled="isSpecialist" required>
                     <option value="">Seleccionar especialista...</option>
-                    <option v-for="e in especialistas_lista" :key="e.id" :value="e.id">{{ e.name }}</option>
+                    <option v-for="e in especialistasFiltrados" :key="e.id" :value="e.id">{{ e.name }} ({{ Number(e.comision || 0).toFixed(2) }}%)</option>
                   </select>
                 </div>
 
-                <div class="col-md-6">
+                <div class="col-md-4">
                   <label class="form-label fw-medium">Asistente (opcional)</label>
+                  <input v-model="busquedaAsistente" type="text" class="form-control form-control-sm mb-2" placeholder="Buscar asistente..." :disabled="isSpecialist">
                   <select class="form-select" v-model="formTurno.asistente_id" :disabled="isSpecialist">
                     <option value="">Sin asistente</option>
-                    <option v-for="e in asistentesDisponibles" :key="e.id" :value="e.id">{{ e.name }} (3%)</option>
+                    <option v-for="e in asistentesFiltrados" :key="e.id" :value="e.id">{{ e.name }}</option>
                   </select>
+                </div>
+
+                <div class="col-md-3">
+                  <label class="form-label fw-medium">Comisión asistente (% sobre monto total)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    class="form-control"
+                    v-model.number="formTurno.comision_asistente"
+                    placeholder="0.00"
+                    :disabled="!formTurno.asistente_id"
+                  >
                 </div>
 
                 <div v-if="disponibilidadMensaje" class="col-12">
@@ -236,7 +260,31 @@
 
                       <div v-if="s.selected" class="mt-2 ms-4">
                         <div class="row g-2 align-items-center">
-                          <div class="col-8">
+                          <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Especialista del servicio</label>
+                            <select
+                              class="form-select form-select-sm"
+                              :value="formTurno.servicio_especialistas[s.id] ?? getServicioEspecialistaDefault(s)"
+                              @change="formTurno.servicio_especialistas[s.id] = Number($event.target.value) || Number(formTurno.especialista_id || 0)"
+                            >
+                              <option v-for="especialista in getEspecialistasServicioDisponibles(s)" :key="especialista.id" :value="especialista.id">
+                                {{ especialista.name }} ({{ Number(especialista.comision || 0).toFixed(2) }}%)
+                              </option>
+                            </select>
+                          </div>
+                          <div class="col-3">
+                            <label class="form-label small text-muted mb-1">Comisión (%)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              class="form-control form-control-sm"
+                              :value="formTurno.servicio_comisiones[s.id] ?? getEspecialistaComision(s)"
+                              @input="formTurno.servicio_comisiones[s.id] = Number($event.target.value) || 0"
+                            >
+                          </div>
+                          <div class="col-3">
                             <label class="form-label small text-muted mb-1">Precio manual</label>
                             <input
                               type="number"
@@ -247,9 +295,9 @@
                               @input="formTurno.precios_servicios[s.id] = Number($event.target.value) || 0"
                             >
                           </div>
-                          <div class="col-4 d-flex align-items-end">
-                            <small class="text-muted">${{ Number(formTurno.precios_servicios[s.id] ?? s.precio).toFixed(2) }}</small>
-                          </div>
+                        </div>
+                        <div class="mt-2 text-end small text-muted">
+                          Precio del servicio: ${{ Number(formTurno.precios_servicios[s.id] ?? getServicioPrecioBase(s)).toFixed(2) }}
                         </div>
                       </div>
                     </div>
@@ -314,18 +362,67 @@
                   </div>
                 </div>
 
-                <!-- Resumen Automático -->
-                <div class="col-12 mt-3 p-3 bg-ayla-cream rounded d-flex justify-content-between align-items-center">
-                  <div>
-                    <span class="text-muted small d-block">Duración Total Estimada (con holgura):</span>
-                    <strong class="fs-5 text-ayla-dark">{{ duracionTotal }} min</strong>
+                <!-- Totalización y Desglose para el Cliente -->
+                <div class="col-12 mt-3 p-3 bg-ayla-cream rounded border">
+                  <h6 class="fw-bold brand-font text-ayla-dark mb-2">
+                    <i class="bi bi-receipt me-2"></i>Totalización y Desglose para el Cliente
+                  </h6>
+
+                  <!-- Tabla de detalle de servicios seleccionados -->
+                  <div v-if="serviciosState.some(s => s.selected)" class="table-responsive mb-3">
+                    <table class="table table-sm table-bordered bg-white mb-0 align-middle">
+                      <thead class="table-light">
+                        <tr class="small text-muted">
+                          <th>Servicio</th>
+                          <th>Especialista</th>
+                          <th class="text-center">Comisión Esp.</th>
+                          <th class="text-end">Precio ($)</th>
+                          <th class="text-end">Precio (Bs)</th>
+                        </tr>
+                      </thead>
+                      <tbody class="small">
+                        <tr v-for="s in serviciosState.filter(s => s.selected)" :key="'det-'+s.id">
+                          <td>{{ s.nombre }}</td>
+                          <td>{{ getEspecialistaActual(s)?.name || 'Principal' }}</td>
+                          <td class="text-center">{{ Number(formTurno.servicio_comisiones[s.id] ?? getEspecialistaComision(s)).toFixed(2) }}%</td>
+                          <td class="text-end fw-medium">${{ getServicioPrecioBase(s).toFixed(2) }}</td>
+                          <td class="text-end text-ayla-rose">Bs. {{ (getServicioPrecioBase(s) * (s.precio_bs / (s.precio || 1))).toFixed(2) }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
-                  <div class="text-end">
-                      <span class="text-muted small d-block">{{ tieneServicioRecurrente ? 'Precio del paquete:' : 'Monto por sesión:' }}</span>
-                      <strong class="fs-6 text-ayla-dark">${{ precioResumen.toFixed(2) }}</strong>
-                      <span class="text-muted small d-block mt-1">Total a pagar por {{ sesionesSeleccionadas }} sesión{{ sesionesSeleccionadas === 1 ? '' : 'es' }}:</span>
-                    <strong class="fs-4 text-ayla-dark">${{ precioTotal.toFixed(2) }}</strong>
-                    <span class="text-ayla-rose small d-block">Bs. {{ precioTotalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+
+                  <div class="row g-2 align-items-center pt-2 border-top">
+                    <div class="col-md-6">
+                      <div class="small text-muted mb-1">
+                        Subtotal Servicios: <strong class="text-dark">${{ subtotalServiciosUsd.toFixed(2) }}</strong> / <strong class="text-ayla-rose">Bs. {{ subtotalServiciosBs.toFixed(2) }}</strong>
+                      </div>
+                      <div v-if="formTurno.asistente_id" class="small text-muted mb-1">
+                        Recargo Asistente ({{ Number(formTurno.comision_asistente || 0).toFixed(2) }}%): <strong class="text-dark">+${{ comisionAsistenteMontoUsd.toFixed(2) }}</strong> / <strong class="text-ayla-rose">+Bs. {{ comisionAsistenteMontoBs.toFixed(2) }}</strong>
+                      </div>
+                      <div class="small text-muted">
+                        Duración estimada: <strong>{{ duracionTotal }} min</strong>
+                      </div>
+                    </div>
+
+                    <div class="col-md-6 text-end">
+                      <span class="text-muted small d-block">TOTAL A PAGAR POR EL CLIENTE:</span>
+                      <strong class="fs-3 text-ayla-dark d-block">${{ precioTotal.toFixed(2) }}</strong>
+                      <span class="text-ayla-rose fw-bold fs-6">Bs. {{ precioTotalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+                    </div>
+                  </div>
+
+                  <!-- Ganancias estimadas asignadas a cada especialista -->
+                  <div v-if="resumenGananciasEspecialistas.length" class="mt-3 pt-2 border-top">
+                    <span class="text-muted small fw-bold d-block mb-1"><i class="bi bi-wallet2 me-1"></i>Ganancias asignadas a especialistas:</span>
+                    <div class="d-flex flex-wrap gap-2">
+                      <span v-for="g in resumenGananciasEspecialistas" :key="g.nombre" class="badge bg-white text-dark border p-2">
+                        <strong>{{ g.nombre }}:</strong> ${{ g.gananciaUsd.toFixed(2) }}
+                      </span>
+                      <span v-if="formTurno.asistente_id" class="badge bg-white text-dark border p-2">
+                        <strong>Asistente ({{ (asistentesFiltrados.find(a => a.id === formTurno.asistente_id)?.name || 'Asistente') }}):</strong> ${{ comisionAsistenteMontoUsd.toFixed(2) }}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -354,34 +451,76 @@
                 <strong>{{ citaSeleccionada.paciente }}</strong>
               </li>
               <li class="list-group-item d-flex justify-content-between">
-                <span class="text-muted">Servicio(s):</span>
-                <span>{{ citaSeleccionada.servicio }}</span>
-              </li>
-              <li class="list-group-item d-flex justify-content-between">
-                <span class="text-muted">Especialista:</span>
+                <span class="text-muted">Especialista Principal:</span>
                 <span>{{ citaSeleccionada.especialista }}</span>
+              </li>
+              <li v-if="citaSeleccionada.asistente" class="list-group-item d-flex justify-content-between">
+                <span class="text-muted">Asistente:</span>
+                <span>{{ citaSeleccionada.asistente }} ({{ Number(citaSeleccionada.comision_asistente_porcentaje || 0).toFixed(2) }}%)</span>
               </li>
               <li class="list-group-item d-flex justify-content-between">
                 <span class="text-muted">Horario:</span>
                 <span>{{ citaSeleccionada.hora_inicio }} - {{ citaSeleccionada.hora_fin }}</span>
               </li>
-              <li class="list-group-item d-flex justify-content-between">
-                <span class="text-muted">Cabina:</span>
-                <span>{{ citaSeleccionada.cabina }}</span>
-              </li>
-              <li class="list-group-item d-flex justify-content-between">
-                <span class="text-muted">Monto Total:</span>
-                <strong class="text-success">${{ citaSeleccionada.monto.toFixed(2) }}<br><span class="small text-ayla-rose">Bs. {{ Number(citaSeleccionada.monto_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span></strong>
-              </li>
-              <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span class="text-muted">Estado Actual:</span>
+            </ul>
+
+            <!-- Detalle de Servicios de la Cita -->
+            <div v-if="citaSeleccionada.servicios_detalle && citaSeleccionada.servicios_detalle.length" class="mb-3">
+              <span class="fw-bold small text-muted d-block mb-2"><i class="bi bi-list-check me-1"></i>Desglose de Servicios & Ganancias por Especialista:</span>
+              <div class="table-responsive">
+                <table class="table table-sm table-bordered bg-white align-middle mb-0">
+                  <thead class="table-light">
+                    <tr class="small text-muted">
+                      <th>Servicio</th>
+                      <th>Especialista</th>
+                      <th class="text-center">Comisión</th>
+                      <th class="text-end">Monto Servicio</th>
+                      <th class="text-end">Ganancia Esp.</th>
+                    </tr>
+                  </thead>
+                  <tbody class="small">
+                    <tr v-for="sDet in citaSeleccionada.servicios_detalle" :key="'sd-'+sDet.id">
+                      <td>{{ sDet.nombre }}</td>
+                      <td>{{ sDet.especialista_nombre }}</td>
+                      <td class="text-center">{{ Number(sDet.comision_porcentaje || 0).toFixed(2) }}%</td>
+                      <td class="text-end fw-medium">
+                        ${{ Number(sDet.precio || 0).toFixed(2) }}
+                        <br><span class="small text-ayla-rose">Bs. {{ Number(sDet.precio_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+                      </td>
+                      <td class="text-end text-success fw-bold">
+                        ${{ Number(sDet.ganancia || 0).toFixed(2) }}
+                        <br><span class="small text-ayla-rose">Bs. {{ Number(sDet.ganancia_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+                      </td>
+                    </tr>
+                    <tr v-if="citaSeleccionada.asistente" class="table-light">
+                      <td><i class="bi bi-person-badge me-1"></i> Asistencia en cita</td>
+                      <td>{{ citaSeleccionada.asistente }} (Asistente)</td>
+                      <td class="text-center">{{ Number(citaSeleccionada.comision_asistente_porcentaje || 0).toFixed(2) }}%</td>
+                      <td class="text-end text-muted">-</td>
+                      <td class="text-end text-success fw-bold">
+                        +${{ Number(citaSeleccionada.monto_asistente || 0).toFixed(2) }}
+                        <br><span class="small text-ayla-rose">+Bs. {{ Number(citaSeleccionada.monto_asistente_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="p-3 bg-ayla-cream rounded d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <span class="text-muted small d-block">TOTAL A PAGAR POR EL CLIENTE:</span>
                 <span class="badge" :class="{
                   'bg-success': citaSeleccionada.estado === 'Completado',
                   'bg-warning text-dark': citaSeleccionada.estado === 'En Proceso',
                   'bg-secondary': citaSeleccionada.estado === 'Confirmado'
                 }">{{ citaSeleccionada.estado }}</span>
-              </li>
-            </ul>
+              </div>
+              <div class="text-end">
+                <strong class="fs-4 text-ayla-dark">${{ Number(citaSeleccionada.monto || 0).toFixed(2) }}</strong>
+                <span class="small text-ayla-rose d-block fw-bold">Bs. {{ Number(citaSeleccionada.monto_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+              </div>
+            </div>
 
             <div class="border rounded p-3 bg-light mb-3">
               <label class="form-label fw-medium">Estado del turno</label>
@@ -400,11 +539,15 @@
             </div>
           </div>
           <div class="modal-footer border-top d-flex justify-content-between">
-            <button type="button" class="btn btn-outline-danger btn-sm">Cancelar Cita</button>
-            <button type="button" class="btn btn-ayla-primary btn-sm" @click="guardarEstadoTurno" :disabled="estadoForm.processing">
-              {{ estadoForm.processing ? 'Guardando...' : 'Guardar cambios' }}
+            <button type="button" class="btn btn-outline-danger btn-sm" @click="eliminarCita(citaSeleccionada.id)">
+              <i class="bi bi-trash me-1"></i> Eliminar Cita
             </button>
-            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-ayla-primary btn-sm" @click="guardarEstadoTurno" :disabled="estadoForm.processing">
+                {{ estadoForm.processing ? 'Guardando...' : 'Guardar cambios' }}
+              </button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+            </div>
           </div>
         </div>
       </div>
@@ -468,9 +611,14 @@
                 </div>
               </div>
             </div>
-            <div class="modal-footer border-top">
-              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-              <button type="submit" class="btn btn-ayla-primary" :disabled="citaEditForm.processing">Guardar cambios</button>
+            <div class="modal-footer border-top d-flex justify-content-between">
+              <button type="button" class="btn btn-outline-danger" @click="eliminarCita(citaSeleccionada.id)">
+                <i class="bi bi-trash me-1"></i> Eliminar Cita
+              </button>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-ayla-primary" :disabled="citaEditForm.processing">Guardar cambios</button>
+              </div>
             </div>
           </form>
         </div>
@@ -588,6 +736,25 @@ const authUser = computed(() => page.props.auth?.user || null);
 const isSpecialist = computed(() => authUser.value?.role === 'especialista');
 const isAdmin = computed(() => authUser.value?.role === 'admin');
 const disponibilidadMensaje = computed(() => page.props.errors?.disponibilidad || '');
+const busquedaEspecialista = ref('');
+const busquedaAsistente = ref('');
+
+const especialistasFiltrados = computed(() => {
+  const texto = busquedaEspecialista.value.trim().toLowerCase();
+  return (props.especialistas_lista || []).filter((especialista) => {
+    if (!texto) return true;
+    return especialista.name?.toLowerCase().includes(texto);
+  });
+});
+
+const asistentesFiltrados = computed(() => {
+  const texto = busquedaAsistente.value.trim().toLowerCase();
+  return (props.especialistas_lista || []).filter((especialista) => {
+    if (Number(especialista.id) === Number(formTurno.especialista_id || 0)) return false;
+    if (!texto) return true;
+    return especialista.name?.toLowerCase().includes(texto);
+  });
+});
 
 // Formulario reactivo para los Filtros de búsqueda
 const filterForm = ref({
@@ -624,6 +791,9 @@ const citaEditForm = useForm({
   paciente_id: '',
   especialista_id: '',
   servicios: [],
+  servicio_especialistas: {},
+  servicio_comisiones: {},
+  precios_servicios: {},
   fecha: '',
   hora_inicio: '',
   holgura_min: 15
@@ -672,6 +842,27 @@ const guardarEdicionCita = () => {
   });
 };
 
+const eliminarCita = (citaId) => {
+  if (!citaId) return;
+  if (confirm('¿Estás seguro de que deseas eliminar esta cita de la agenda? Esta acción no se puede deshacer.')) {
+    router.delete('/agenda/' + citaId, {
+      preserveScroll: true,
+      onSuccess: () => {
+        const modalDetalleEl = document.getElementById('modalDetalleCita');
+        if (modalDetalleEl) {
+          const modalDetalle = bootstrap.Modal.getInstance(modalDetalleEl);
+          if (modalDetalle) modalDetalle.hide();
+        }
+        const modalEditarEl = document.getElementById('modalEditarCita');
+        if (modalEditarEl) {
+          const modalEditar = bootstrap.Modal.getInstance(modalEditarEl);
+          if (modalEditar) modalEditar.hide();
+        }
+      }
+    });
+  }
+};
+
 const guardarEstadoTurno = () => {
   if (!citaSeleccionada.value) return;
 
@@ -705,8 +896,11 @@ const formTurno = useForm({
   paciente_id: '',
   especialista_id: isSpecialist.value ? (authUser.value?.id || '') : '',
   asistente_id: '',
+  comision_asistente: 0,
   servicios: [],
   precios_servicios: {},
+  servicio_especialistas: {},
+  servicio_comisiones: {},
   fecha: props.filters.fecha || new Date().toISOString().substr(0, 10),
   hora_inicio: '08:00',
   holgura_min: 15,
@@ -714,6 +908,54 @@ const formTurno = useForm({
   dias_semana: [],
   cantidad_sesiones: 3
 });
+
+const getEspecialistasServicioDisponibles = (servicio) => {
+  const principalId = Number(formTurno.especialista_id || 0);
+  const asistenteId = Number(formTurno.asistente_id || 0);
+  const opciones = [];
+
+  if (principalId) {
+    const principal = (props.especialistas_lista || []).find((e) => Number(e.id) === principalId);
+    if (principal) opciones.push(principal);
+  }
+
+  if (asistenteId && asistenteId !== principalId) {
+    const asistente = (props.especialistas_lista || []).find((e) => Number(e.id) === asistenteId);
+    if (asistente) opciones.push(asistente);
+  }
+
+  return opciones.length ? opciones : (props.especialistas_lista || []);
+};
+
+const getEspecialistaActual = (servicio) => {
+  const especialistaId = Number(formTurno.servicio_especialistas?.[servicio.id] ?? formTurno.especialista_id ?? getServicioEspecialistaDefault(servicio) ?? 0);
+  return (props.especialistas_lista || []).find((item) => Number(item.id) === especialistaId) || null;
+};
+
+const getEspecialistaComision = (servicio) => {
+  return Number(getEspecialistaActual(servicio)?.comision ?? 0);
+};
+
+const getServicioEspecialistaDefault = (servicio) => {
+  const especialistasDisponibles = getEspecialistasServicioDisponibles(servicio);
+  const principalId = Number(formTurno.especialista_id || 0);
+
+  if (principalId && especialistasDisponibles.some((especialista) => Number(especialista.id) === principalId)) {
+    return principalId;
+  }
+
+  if (especialistasDisponibles.length > 0) {
+    return Number(especialistasDisponibles[0].id);
+  }
+
+  return principalId || 0;
+};
+
+const getServicioPrecioBase = (servicio) => {
+  const especialistaId = Number(formTurno.servicio_especialistas?.[servicio.id] ?? formTurno.especialista_id ?? getServicioEspecialistaDefault(servicio) ?? 0);
+  const especialista = (servicio.especialistas || []).find((item) => Number(item.id) === especialistaId);
+  return Number(formTurno.precios_servicios?.[servicio.id] ?? especialista?.precio_especialista ?? servicio.precio ?? 0);
+};
 
 const serviciosDisponibles = computed(() => {
   const especialistaId = Number(formTurno.especialista_id || 0);
@@ -744,8 +986,30 @@ watch(
       ...servicio,
       selected: false,
     }));
+
+    if (Number(formTurno.especialista_id || 0)) {
+      const especialista = (props.especialistas_lista || []).find((e) => Number(e.id) === Number(formTurno.especialista_id));
+      if (especialista) {
+        formTurno.servicio_comisiones = { ...formTurno.servicio_comisiones, default: Number(especialista.comision || 0) };
+      }
+    }
   },
   { immediate: true }
+);
+
+watch(
+  () => serviciosState.value.filter((s) => s.selected).map((s) => s.id),
+  (ids) => {
+    ids.forEach((id) => {
+      if (formTurno.servicio_comisiones[id] === undefined || formTurno.servicio_comisiones[id] === null || formTurno.servicio_comisiones[id] === '') {
+        const servicio = serviciosState.value.find((s) => Number(s.id) === Number(id));
+        if (servicio) {
+          formTurno.servicio_comisiones[id] = getEspecialistaComision(servicio);
+        }
+      }
+    });
+  },
+  { deep: true }
 );
 
 // Cálculos reactivos de tiempo y costo
@@ -758,27 +1022,71 @@ const tieneServicioRecurrente = computed(() => {
   return serviciosState.value.some(s => s.selected && s.es_recurrente === true);
 });
 
-const precioTotal = computed(() => {
+const subtotalServiciosUsd = computed(() => {
   return serviciosState.value.filter(s => s.selected).reduce((acc, s) => {
-    const precioBase = Number(formTurno.precios_servicios?.[s.id] ?? s.precio ?? 0);
+    const precioBase = getServicioPrecioBase(s);
     const valorServicio = s.es_recurrente === true ? precioBase : precioBase * sesionesSeleccionadas.value;
     return acc + valorServicio;
   }, 0);
 });
 
-const precioTotalBs = computed(() => {
+const subtotalServiciosBs = computed(() => {
   return serviciosState.value.filter(s => s.selected).reduce((acc, s) => {
-    const precioBase = Number(formTurno.precios_servicios?.[s.id] ?? s.precio ?? 0);
+    const precioBase = getServicioPrecioBase(s);
     const valorServicio = s.es_recurrente === true ? precioBase : precioBase * sesionesSeleccionadas.value;
-    return acc + valorServicio * Number(s.precio_bs || 0) / Number(s.precio || 1);
+    const tasa = Number(s.precio_bs || 0) / Number(s.precio || 1 || 1);
+    return acc + valorServicio * tasa;
   }, 0);
+});
+
+const comisionAsistenteMontoUsd = computed(() => {
+  if (!formTurno.asistente_id) return 0;
+  const pct = Number(formTurno.comision_asistente || 0);
+  return subtotalServiciosUsd.value * (pct / 100);
+});
+
+const comisionAsistenteMontoBs = computed(() => {
+  if (!formTurno.asistente_id) return 0;
+  const pct = Number(formTurno.comision_asistente || 0);
+  return subtotalServiciosBs.value * (pct / 100);
+});
+
+const precioTotal = computed(() => {
+  return subtotalServiciosUsd.value + comisionAsistenteMontoUsd.value;
+});
+
+const precioTotalBs = computed(() => {
+  return subtotalServiciosBs.value + comisionAsistenteMontoBs.value;
 });
 
 const precioResumen = computed(() => {
   return serviciosState.value.filter(s => s.selected).reduce((acc, s) => {
-    const precioBase = Number(formTurno.precios_servicios?.[s.id] ?? s.precio ?? 0);
-    return acc + (s.es_recurrente === true ? precioBase : precioBase);
+    const precioBase = getServicioPrecioBase(s);
+    return acc + precioBase;
   }, 0);
+});
+
+const resumenGananciasEspecialistas = computed(() => {
+  const map = {};
+  serviciosState.value.filter(s => s.selected).forEach(s => {
+    const esp = getEspecialistaActual(s);
+    const espId = esp ? esp.id : (formTurno.especialista_id || 0);
+    const espNombre = esp ? esp.name : 'Especialista';
+    const comisionPct = Number(formTurno.servicio_comisiones?.[s.id] ?? getEspecialistaComision(s) ?? 0);
+    const precioUsd = getServicioPrecioBase(s) * (s.es_recurrente === true ? 1 : sesionesSeleccionadas.value);
+    const gananciaUsd = precioUsd * (comisionPct / 100);
+
+    if (!map[espId]) {
+      map[espId] = {
+        nombre: espNombre,
+        totalServiciosUsd: 0,
+        gananciaUsd: 0,
+      };
+    }
+    map[espId].totalServiciosUsd += precioUsd;
+    map[espId].gananciaUsd += gananciaUsd;
+  });
+  return Object.values(map);
 });
 
 const sesionesSeleccionadas = computed(() => {
@@ -820,8 +1128,22 @@ const guardarTurno = () => {
   formTurno.precios_servicios = Object.fromEntries(
     serviciosState.value
       .filter(s => s.selected)
-      .map(s => [s.id, Number(formTurno.precios_servicios?.[s.id] ?? s.precio ?? 0)])
+      .map(s => [s.id, Number(formTurno.precios_servicios?.[s.id] ?? getServicioPrecioBase(s) ?? 0)])
   );
+  formTurno.servicio_especialistas = Object.fromEntries(
+    serviciosState.value
+      .filter(s => s.selected)
+      .map(s => [s.id, Number(formTurno.servicio_especialistas?.[s.id] ?? getServicioEspecialistaDefault(s) ?? formTurno.especialista_id ?? 0)])
+  );
+  formTurno.servicio_comisiones = Object.fromEntries(
+    serviciosState.value
+      .filter(s => s.selected)
+      .map(s => [s.id, Number(formTurno.servicio_comisiones?.[s.id] ?? getEspecialistaComision(s) ?? 0)])
+  );
+
+  if (!formTurno.asistente_id) {
+    formTurno.comision_asistente = 0;
+  }
 
   if (formTurno.recurrencia === 'ninguna') {
     formTurno.dias_semana = [];

@@ -43,6 +43,25 @@
         <div class="small text-muted mt-2">Última actualización: {{ tasas?.actualizada_en || 'Consultando API...' }}</div>
       </div>
 
+      <div v-if="isAdmin" class="card-ayla p-3 mb-4">
+        <form @submit.prevent="aplicarFiltro" class="row g-3 align-items-end">
+          <div class="col-md-5">
+            <label class="form-label small text-muted mb-1">Especialista</label>
+            <select class="form-select" v-model="filterForm.especialista_id">
+              <option value="">Todos los especialistas</option>
+              <option v-for="e in especialistas_lista" :key="e.id" :value="e.id">{{ e.name }}</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small text-muted mb-1">Fecha</label>
+            <input type="date" class="form-control" v-model="filterForm.fecha">
+          </div>
+          <div class="col-md-3">
+            <button type="submit" class="btn btn-ayla-secondary w-100">Ver actividad</button>
+          </div>
+        </form>
+      </div>
+
       <!-- Tarjetas KPI -->
       <div class="row g-3 mb-4">
         <div class="col-md-3">
@@ -386,16 +405,27 @@ const props = defineProps({
   pacientes_lista: Array,
   servicios_lista: Array,
   especialistas_lista: Array,
-  tasas: Object
+  tasas: Object,
+  filters: Object
 });
 
 const isAdmin = computed(() => usePage().props.auth?.user?.role === 'admin');
+const filterForm = ref({
+  fecha: props.filters?.fecha || new Date().toISOString().substr(0, 10),
+  especialista_id: props.filters?.especialista_id || ''
+});
 const tasasForm = ref({
   dolar_bcv: Number(props.tasas?.dolar_bcv || 0),
   euro_bcv: Number(props.tasas?.euro_bcv || 0)
 });
 const actualizarTasas = () => {
   useForm(tasasForm.value).post('/tasas-cambio');
+};
+const aplicarFiltro = () => {
+  const payload = { ...filterForm.value };
+  const fecha = payload.fecha || new Date().toISOString().substr(0, 10);
+  payload.fecha = fecha;
+  window.location.href = `/dashboard?fecha=${encodeURIComponent(fecha)}${payload.especialista_id ? `&especialista_id=${payload.especialista_id}` : ''}`;
 };
 
 // Cita seleccionada para ver en modal

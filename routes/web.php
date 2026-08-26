@@ -8,18 +8,19 @@ use App\Http\Controllers\ServicioController;
 use App\Http\Controllers\UsuarioController;
 use App\Http\Controllers\ReporteController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 
 
 // Rutas protegidas (Requieren autenticación)
 Route::middleware(['auth'])->group(function () {
-    Route::get('/', function () {
-        if (auth()->user()?->role === 'especialista') {
+    Route::get('/', function (Illuminate\Http\Request $request) {
+        if (Auth::user()?->role === 'especialista') {
             return redirect()->route('especialista.panel');
         }
 
-        return app(DashboardController::class)->index();
+        return app(DashboardController::class)->index($request);
     })->name('dashboard');
     Route::post('/tasas-cambio', [DashboardController::class, 'actualizarTasas'])
         ->name('tasas.update');
@@ -28,10 +29,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/agenda', [AgendaController::class, 'index'])->name('agenda.index');
     Route::post('/agenda', [AgendaController::class, 'store'])->name('agenda.store');
     Route::put('/agenda/{cita}', [AgendaController::class, 'update'])->name('agenda.update');
+    Route::delete('/agenda/{cita}', [AgendaController::class, 'destroy'])->name('agenda.destroy');
 
     // Módulo de Pacientes
     Route::get('/pacientes', function () {
-        abort_unless(auth()->user()?->role === 'admin', 403, 'No tienes permisos para ver pacientes.');
+        abort_unless(Auth::user()?->role === 'admin', 403, 'No tienes permisos para ver pacientes.');
 
         return app(PacienteController::class)->index(request());
     })->name('pacientes.index');
@@ -41,6 +43,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/servicios', [ServicioController::class, 'index'])->name('servicios.index');
     Route::post('/servicios', [ServicioController::class, 'store'])->name('servicios.store');
     Route::put('/servicios/{servicio}', [ServicioController::class, 'update'])->name('servicios.update');
+    Route::delete('/servicios/{servicio}', [ServicioController::class, 'destroy'])->name('servicios.destroy');
 
     // Módulo de Usuarios y Especialistas
     Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');

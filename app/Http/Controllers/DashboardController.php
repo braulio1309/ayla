@@ -16,12 +16,15 @@ class DashboardController extends Controller
         $this->dashboardService = $dashboardService;
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $data = $this->dashboardService->getDashboardData();
+        $fecha = $request->input('fecha', now()->format('Y-m-d'));
+        $especialistaId = $request->input('especialista_id');
+        $data = $this->dashboardService->getDashboardData($fecha, $especialistaId ? (int) $especialistaId : null);
 
         return Inertia::render('Dashboard', [
             'kpis' => $data['kpis'],
+            'filters' => $data['filters'],
             'tasas' => [
                 'dolar_bcv' => (float) $data['tasas']->dolar_bcv,
                 'euro_bcv' => (float) $data['tasas']->euro_bcv,

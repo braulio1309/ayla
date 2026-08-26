@@ -114,4 +114,15 @@ class ServicioController extends Controller
 
         return redirect()->back()->with('success', 'Servicio actualizado correctamente.');
     }
+
+    public function destroy(Servicio $servicio)
+    {
+        abort_unless(Auth::check() && Auth::user()->role === 'admin', 403, 'No tienes permisos para eliminar servicios.');
+
+        $servicio->especialistas()->detach();
+        $servicio->citas()->detach();
+        $servicio->delete();
+
+        return redirect()->back()->with('success', 'Servicio eliminado correctamente.');
+    }
 }

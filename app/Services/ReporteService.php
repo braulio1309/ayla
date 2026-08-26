@@ -41,39 +41,70 @@ class ReporteService
         $totalGeneral = (float) $citas->sum('monto_total');
         $totalGeneralBs = (float) $citas->sum('monto_total_bs');
 
-        $auditoria = $citas->groupBy('user_id')->map(function ($items) use ($totalGeneral) {
-            $especialista = null;
-            if ($items->isNotEmpty() && $items->first()->especialista) {
-                $especialista = $items->first()->especialista;
+        $auditoriaMap = [];
+        foreach ($citas as $cita) {
+            foreach ($cita->servicios as $servicio) {
+                $espId = (int) ($servicio->pivot->especialista_id ?: $cita->user_id);
+                $esp = $espId === (int) $cita->user_id ? $cita->especialista : User::find($espId);
+                $espNombre = $esp ? $esp->name : 'Sin especialista';
+                $espRole = $esp ? $esp->role : 'especialista';
+
+                if (!isset($auditoriaMap[$espId])) {
+                    $auditoriaMap[$espId] = [
+                        'especialista' => $espNombre,
+                        'categoria' => $espRole === 'especialista' ? 'Especialista' : 'Administrador',
+                        'citas_completadas' => 0,
+                        'citas_ids' => [],
+                        'ingreso_generado' => 0,
+                        'ingreso_generado_bs' => 0,
+                        'comision_especialista' => 0,
+                        'comision_asistentes' => 0,
+                    ];
+                }
+
+                if (!in_array($cita->id, $auditoriaMap[$espId]['citas_ids'])) {
+                    $auditoriaMap[$espId]['citas_ids'][] = $cita->id;
+                    $auditoriaMap[$espId]['citas_completadas']++;
+                }
+
+                $precio = (float) ($servicio->pivot->precio_momento ?? 0);
+                $precioBs = (float) ($servicio->pivot->monto_bs_momento ?? 0);
+                $comisionPct = (float) ($servicio->pivot->comision_momento ?? ($esp->comision ?? 0));
+
+                $auditoriaMap[$espId]['ingreso_generado'] += $precio;
+                $auditoriaMap[$espId]['ingreso_generado_bs'] += $precioBs;
+                $auditoriaMap[$espId]['comision_especialista'] += round($precio * ($comisionPct / 100), 2);
             }
 
-            $total = (float) $items->sum('monto_total');
-            $totalBs = (float) $items->sum('monto_total_bs');
-            $porcentajeComision = $especialista && $especialista->role === 'especialista' ? (float) ($especialista->comision ?? 0) : 0;
-            $comisionEspecialista = round($total * ($porcentajeComision / 100), 2);
-            $comisionAsistentes = round($items->sum(function ($cita) {
-                return $cita->asistente_id ? (float) $cita->monto_total * ((float) ($cita->comision_asistente_porcentaje ?? 3) / 100) : 0;
-            }), 2);
-            $negocio = round($total - $comisionEspecialista - $comisionAsistentes, 2);
-            $porcentaje = $totalGeneral > 0 ? round(($total / $totalGeneral) * 100, 1) : 0;
-            $categoria = 'Sin categoría';
-
-            if ($especialista) {
-                $categoria = $especialista->role === 'especialista' ? 'Especialista' : 'Administrador';
+            if ($cita->asistente_id) {
+                $asistenteId = (int) $cita->asistente_id;
+                $asistente = $cita->asistente ?: User::find($asistenteId);
+                if (!isset($auditoriaMap[$asistenteId])) {
+                    $auditoriaMap[$asistenteId] = [
+                        'especialista' => $asistente ? $asistente->name : 'Asistente',
+                        'categoria' => 'Asistente',
+                        'citas_completadas' => 0,
+                        'citas_ids' => [],
+                        'ingreso_generado' => 0,
+                        'ingreso_generado_bs' => 0,
+                        'comision_especialista' => 0,
+                        'comision_asistentes' => 0,
+                    ];
+                }
+                $subtotalCita = (float) $cita->servicios->sum('pivot.precio_momento');
+                if ($subtotalCita <= 0) $subtotalCita = (float) $cita->monto_total;
+                $montoAsistente = round($subtotalCita * (((float) ($cita->comision_asistente_porcentaje ?? 0)) / 100), 2);
+                $auditoriaMap[$asistenteId]['comision_asistentes'] += $montoAsistente;
             }
+        }
 
-            return [
-                'especialista' => $especialista ? $especialista->name : 'Sin especialista',
-                'categoria' => $categoria,
-                'citas_completadas' => $items->count(),
-                'ingreso_generado' => round($total, 2),
-                'ingreso_generado_bs' => round($totalBs, 2),
-                'comision_especialista' => $comisionEspecialista,
-                'comision_asistentes' => $comisionAsistentes,
-                'ganancia_negocio' => $negocio,
-                'aporte_porcentaje' => $porcentaje . '%',
-            ];
-        })->values()->all();
+        $auditoria = array_values(array_map(function ($item) use ($totalGeneral) {
+            $totalGenerado = $item['ingreso_generado'];
+            $item['ganancia_negocio'] = round($totalGenerado - $item['comision_especialista'] - $item['comision_asistentes'], 2);
+            $item['aporte_porcentaje'] = $totalGeneral > 0 ? round(($totalGenerado / $totalGeneral) * 100, 1) . '%' : '0%';
+            unset($item['citas_ids']);
+            return $item;
+        }, $auditoriaMap));
 
         $totalComisionEspecialistas = round(array_sum(array_column($auditoria, 'comision_especialista')), 2);
         $totalComisionAsistentes = round(array_sum(array_column($auditoria, 'comision_asistentes')), 2);

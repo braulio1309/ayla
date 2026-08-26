@@ -53,9 +53,15 @@ class AgendaController extends Controller
             'paciente_id' => 'required|exists:pacientes,id',
             'especialista_id' => 'required|exists:users,id',
             'asistente_id' => 'nullable|exists:users,id|different:especialista_id',
+            'comision_asistente' => 'nullable|numeric|min:0|max:100',
             'servicios' => 'required|array|min:1',
+            'servicios.*' => 'integer|exists:servicios,id',
             'precios_servicios' => 'nullable|array',
             'precios_servicios.*' => 'nullable|numeric|min:0',
+            'servicio_especialistas' => 'nullable|array',
+            'servicio_especialistas.*' => 'nullable|exists:users,id',
+            'servicio_comisiones' => 'nullable|array',
+            'servicio_comisiones.*' => 'nullable|numeric|min:0|max:100',
             'fecha' => 'required|date',
             'hora_inicio' => 'required',
             'holgura_min' => 'required|numeric',
@@ -105,8 +111,9 @@ class AgendaController extends Controller
             }
         }
 
-        $precioTotal = $serviciosSeleccionados->sum(function ($servicio) use ($validated, $request) {
-            $precioServicio = $servicio->getPrecioParaEspecialista((int) $validated['especialista_id']);
+        $subtotalServicios = $serviciosSeleccionados->sum(function ($servicio) use ($validated, $request) {
+            $especialistaServicioId = (int) ($request->input('servicio_especialistas.' . $servicio->id, $validated['especialista_id']) ?? $validated['especialista_id']);
+            $precioServicio = $servicio->getPrecioParaEspecialista($especialistaServicioId);
             $precioManual = $request->input('precios_servicios.' . $servicio->id);
             $precioFinal = (float) ($precioManual !== null && $precioManual !== '' ? $precioManual : $precioServicio);
 
@@ -117,7 +124,10 @@ class AgendaController extends Controller
         });
 
         $tasas = $this->tasaCambioService->obtener();
-        $montoTotalBs = round($precioTotal * (float) $tasas->dolar_bcv, 2);
+        $comisionAsistente = !empty($validated['asistente_id']) ? (float) ($validated['comision_asistente'] ?? 3) : 0;
+        $montoAsistente = !empty($validated['asistente_id']) ? round($subtotalServicios * ($comisionAsistente / 100), 2) : 0;
+        $precioTotal = $subtotalServicios + $montoAsistente;
+        $montoTotalBs = round($precioTotal * (float) $tasas->euro_bcv, 2);
 
         $citasCreadas = [];
         foreach ($fechasAgenda as $fechaCita) {
@@ -129,7 +139,7 @@ class AgendaController extends Controller
                 'paciente_id' => $paciente->id,
                 'user_id' => $validated['especialista_id'],
                 'asistente_id' => $validated['asistente_id'] ?? null,
-                'comision_asistente_porcentaje' => !empty($validated['asistente_id']) ? 3 : null,
+                'comision_asistente_porcentaje' => !empty($validated['asistente_id']) ? $comisionAsistente : null,
                 'fecha' => $fechaCarbon->format('Y-m-d'),
                 'hora_inicio' => $horaInicio->format('H:i:s'),
                 'hora_fin' => $horaFin->format('H:i:s'),
@@ -144,15 +154,18 @@ class AgendaController extends Controller
             ]);
 
             foreach ($serviciosSeleccionados as $servicio) {
+                $especialistaServicioId = (int) ($request->input('servicio_especialistas.' . $servicio->id, $validated['especialista_id']) ?? $validated['especialista_id']);
                 $precioManual = $request->input('precios_servicios.' . $servicio->id);
                 $precioMomento = $precioManual !== null && $precioManual !== ''
                     ? (float) $precioManual
-                    : $servicio->getPrecioParaEspecialista((int) $validated['especialista_id']);
+                    : $servicio->getPrecioParaEspecialista($especialistaServicioId);
 
                 $cita->servicios()->attach($servicio->id, [
-                    'precio_momento' => $servicio->es_recurrente ? $precioMomento : $precioMomento,
-                    'monto_bs_momento' => round($precioMomento * (float) $tasas->dolar_bcv, 2),
+                    'precio_momento' => $precioMomento,
+                    'monto_bs_momento' => round($precioMomento * (float) $tasas->euro_bcv, 2),
                     'duracion_momento' => (int) ($servicio->duracion_min ?? 0),
+                    'especialista_id' => $especialistaServicioId,
+                    'comision_momento' => (float) ($request->input('servicio_comisiones.' . $servicio->id, 0) ?? 0),
                 ]);
             }
 
@@ -211,8 +224,16 @@ class AgendaController extends Controller
             $validated = $request->validate([
                 'paciente_id' => 'required|exists:pacientes,id',
                 'especialista_id' => 'required|exists:users,id',
+                'asistente_id' => 'nullable|exists:users,id',
+                'comision_asistente' => 'nullable|numeric|min:0|max:100',
                 'servicios' => 'required|array|min:1',
                 'servicios.*' => 'integer|exists:servicios,id',
+                'precios_servicios' => 'nullable|array',
+                'precios_servicios.*' => 'nullable|numeric|min:0',
+                'servicio_especialistas' => 'nullable|array',
+                'servicio_especialistas.*' => 'nullable|exists:users,id',
+                'servicio_comisiones' => 'nullable|array',
+                'servicio_comisiones.*' => 'nullable|numeric|min:0|max:100',
                 'fecha' => 'required|date',
                 'hora_inicio' => 'required|date_format:H:i',
                 'holgura_min' => 'required|integer|min:0',
@@ -235,22 +256,52 @@ class AgendaController extends Controller
             }
 
             $horaInicio = Carbon::parse($validated['fecha'] . ' ' . $validated['hora_inicio']);
+            $subtotalServicios = $servicios->sum(function ($servicio) use ($request, $validated) {
+                $especialistaServicioId = (int) ($request->input('servicio_especialistas.' . $servicio->id, $validated['especialista_id']) ?? $validated['especialista_id']);
+                $precioManual = $request->input('precios_servicios.' . $servicio->id);
+                $precio = $precioManual !== null && $precioManual !== ''
+                    ? (float) $precioManual
+                    : (float) $servicio->getPrecioParaEspecialista($especialistaServicioId);
+
+                return $precio;
+            });
+
+            $tasas = $this->tasaCambioService->obtener();
+            $comisionAsistente = !empty($validated['asistente_id']) ? (float) ($validated['comision_asistente'] ?? 3) : 0;
+            $montoAsistente = !empty($validated['asistente_id']) ? round($subtotalServicios * ($comisionAsistente / 100), 2) : 0;
+            $montoTotal = $subtotalServicios + $montoAsistente;
+            $montoTotalBs = round($montoTotal * (float) $tasas->euro_bcv, 2);
+
             $cita->update([
                 'paciente_id' => $validated['paciente_id'],
                 'user_id' => $validated['especialista_id'],
+                'asistente_id' => $validated['asistente_id'] ?? null,
+                'comision_asistente_porcentaje' => !empty($validated['asistente_id']) ? $comisionAsistente : null,
                 'fecha' => $validated['fecha'],
                 'hora_inicio' => $horaInicio->format('H:i:s'),
                 'hora_fin' => $horaInicio->copy()->addMinutes($duracionTotal + $validated['holgura_min'])->format('H:i:s'),
                 'holgura_min' => $validated['holgura_min'],
-                'monto_total' => $servicios->sum(fn ($servicio) => (float) $servicio->getPrecioParaEspecialista((int) $validated['especialista_id'])),
+                'monto_total' => $montoTotal,
+                'monto_total_bs' => $montoTotalBs,
             ]);
 
-            $cita->servicios()->sync($servicios->mapWithKeys(fn ($servicio) => [
-                $servicio->id => [
-                    'precio_momento' => (float) $servicio->getPrecioParaEspecialista((int) $validated['especialista_id']),
-                    'duracion_momento' => (int) ($servicio->duracion_min ?? 0),
-                ],
-            ])->all());
+            $cita->servicios()->sync($servicios->mapWithKeys(function ($servicio) use ($request, $validated) {
+                $especialistaServicioId = (int) ($request->input('servicio_especialistas.' . $servicio->id, $validated['especialista_id']) ?? $validated['especialista_id']);
+                $precioManual = $request->input('precios_servicios.' . $servicio->id);
+                $precioMomento = $precioManual !== null && $precioManual !== ''
+                    ? (float) $precioManual
+                    : (float) $servicio->getPrecioParaEspecialista($especialistaServicioId);
+
+                return [
+                    $servicio->id => [
+                        'precio_momento' => $precioMomento,
+                        'monto_bs_momento' => round($precioMomento * (float) $this->tasaCambioService->obtener()->euro_bcv, 2),
+                        'duracion_momento' => (int) ($servicio->duracion_min ?? 0),
+                        'especialista_id' => $especialistaServicioId,
+                        'comision_momento' => (float) ($request->input('servicio_comisiones.' . $servicio->id, 0) ?? 0),
+                    ],
+                ];
+            })->all());
 
             return redirect()->route('agenda.index', [
                 'fecha' => $validated['fecha'],
@@ -271,6 +322,26 @@ class AgendaController extends Controller
             'fecha' => $cita->fecha ? Carbon::parse($cita->fecha)->format('Y-m-d') : date('Y-m-d'),
             'especialista_id' => $cita->user_id,
         ])->with('success', 'Estado del turno actualizado correctamente.');
+    }
+
+    public function destroy(Cita $cita)
+    {
+        $user = Auth::user();
+
+        if (!$user || ($user->role !== 'admin' && $cita->user_id !== $user->id)) {
+            abort(403, 'No tienes permisos para eliminar este turno.');
+        }
+
+        $fecha = $cita->fecha ? Carbon::parse($cita->fecha)->format('Y-m-d') : date('Y-m-d');
+        $especialistaId = $cita->user_id;
+
+        $cita->servicios()->detach();
+        $cita->delete();
+
+        return redirect()->route('agenda.index', [
+            'fecha' => $fecha,
+            'especialista_id' => $especialistaId,
+        ])->with('success', 'Cita eliminada correctamente.');
     }
 
     private function mapEstadoParaBaseDatos(string $estado): string
