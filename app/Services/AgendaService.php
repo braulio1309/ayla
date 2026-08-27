@@ -63,6 +63,8 @@ class AgendaService
                 $precio = (float) ($servicio->pivot->precio_momento ?? 0);
                 $precioBs = (float) ($servicio->pivot->monto_bs_momento ?? 0);
                 $comisionPct = (float) ($servicio->pivot->comision_momento ?? 0);
+                $comisionTipo = $servicio->pivot->comision_tipo ?? 'porcentaje';
+                $comisionMonto = (float) ($servicio->pivot->comision_monto ?? ($precio * ($comisionPct / 100)));
 
                 return [
                     'id' => $servicio->id,
@@ -72,6 +74,8 @@ class AgendaService
                     'especialista_id' => $espId,
                     'especialista_nombre' => $espNombre,
                     'comision_porcentaje' => $comisionPct,
+                    'comision_tipo' => $comisionTipo,
+                    'comision_monto' => $comisionMonto,
                     'ganancia' => round($precio * ($comisionPct / 100), 2),
                     'ganancia_bs' => round($precioBs * ($comisionPct / 100), 2),
                 ];

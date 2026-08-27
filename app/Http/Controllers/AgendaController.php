@@ -62,6 +62,10 @@ class AgendaController extends Controller
             'servicio_especialistas.*' => 'nullable|exists:users,id',
             'servicio_comisiones' => 'nullable|array',
             'servicio_comisiones.*' => 'nullable|numeric|min:0|max:100',
+            'servicio_comision_tipos' => 'nullable|array',
+            'servicio_comision_tipos.*' => 'nullable|in:porcentaje,monto',
+            'servicio_comision_montos' => 'nullable|array',
+            'servicio_comision_montos.*' => 'nullable|numeric|min:0',
             'fecha' => 'required|date',
             'hora_inicio' => 'required',
             'holgura_min' => 'required|numeric',
@@ -159,13 +163,22 @@ class AgendaController extends Controller
                 $precioMomento = $precioManual !== null && $precioManual !== ''
                     ? (float) $precioManual
                     : $servicio->getPrecioParaEspecialista($especialistaServicioId);
+                $comisionTipo = $request->input('servicio_comision_tipos.' . $servicio->id, 'porcentaje');
+                $comisionValor = $comisionTipo === 'monto'
+                    ? (float) ($request->input('servicio_comision_montos.' . $servicio->id, 0) ?? 0)
+                    : round($precioMomento * ((float) ($request->input('servicio_comisiones.' . $servicio->id, 0) ?? 0) / 100), 2);
+                $comisionPorcentaje = $comisionTipo === 'monto' && $precioMomento > 0
+                    ? round(($comisionValor / $precioMomento) * 100, 2)
+                    : (float) ($request->input('servicio_comisiones.' . $servicio->id, 0) ?? 0);
 
                 $cita->servicios()->attach($servicio->id, [
                     'precio_momento' => $precioMomento,
                     'monto_bs_momento' => round($precioMomento * (float) $tasas->euro_bcv, 2),
                     'duracion_momento' => (int) ($servicio->duracion_min ?? 0),
                     'especialista_id' => $especialistaServicioId,
-                    'comision_momento' => (float) ($request->input('servicio_comisiones.' . $servicio->id, 0) ?? 0),
+                    'comision_momento' => $comisionPorcentaje,
+                    'comision_tipo' => $comisionTipo,
+                    'comision_monto' => $comisionValor,
                 ]);
             }
 
@@ -234,6 +247,10 @@ class AgendaController extends Controller
                 'servicio_especialistas.*' => 'nullable|exists:users,id',
                 'servicio_comisiones' => 'nullable|array',
                 'servicio_comisiones.*' => 'nullable|numeric|min:0|max:100',
+                'servicio_comision_tipos' => 'nullable|array',
+                'servicio_comision_tipos.*' => 'nullable|in:porcentaje,monto',
+                'servicio_comision_montos' => 'nullable|array',
+                'servicio_comision_montos.*' => 'nullable|numeric|min:0',
                 'fecha' => 'required|date',
                 'hora_inicio' => 'required|date_format:H:i',
                 'holgura_min' => 'required|integer|min:0',
@@ -295,6 +312,13 @@ class AgendaController extends Controller
                 $precioMomento = $precioManual !== null && $precioManual !== ''
                     ? (float) $precioManual
                     : (float) $servicio->getPrecioParaEspecialista($especialistaServicioId);
+                $comisionTipo = $request->input('servicio_comision_tipos.' . $servicio->id, 'porcentaje');
+                $comisionValor = $comisionTipo === 'monto'
+                    ? (float) ($request->input('servicio_comision_montos.' . $servicio->id, 0) ?? 0)
+                    : round($precioMomento * ((float) ($request->input('servicio_comisiones.' . $servicio->id, 0) ?? 0) / 100), 2);
+                $comisionPorcentaje = $comisionTipo === 'monto' && $precioMomento > 0
+                    ? round(($comisionValor / $precioMomento) * 100, 2)
+                    : (float) ($request->input('servicio_comisiones.' . $servicio->id, 0) ?? 0);
 
                 return [
                     $servicio->id => [
@@ -302,7 +326,9 @@ class AgendaController extends Controller
                         'monto_bs_momento' => round($precioMomento * (float) $this->tasaCambioService->obtener()->euro_bcv, 2),
                         'duracion_momento' => (int) ($servicio->duracion_min ?? 0),
                         'especialista_id' => $especialistaServicioId,
-                        'comision_momento' => (float) ($request->input('servicio_comisiones.' . $servicio->id, 0) ?? 0),
+                        'comision_momento' => $comisionPorcentaje,
+                        'comision_tipo' => $comisionTipo,
+                        'comision_monto' => $comisionValor,
                     ],
                 ];
             })->all());

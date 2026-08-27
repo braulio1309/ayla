@@ -134,6 +134,8 @@ class ReporteService
                 $precio = (float) ($servicio->pivot->precio_momento ?? 0);
                 $precioBs = (float) ($servicio->pivot->monto_bs_momento ?? 0);
                 $comision = (float) ($servicio->pivot->comision_momento ?? ($especialista?->comision ?? 0));
+                $comisionTipo = $servicio->pivot->comision_tipo ?? 'porcentaje';
+                $comisionMonto = (float) ($servicio->pivot->comision_monto ?? ($precio * ($comision / 100)));
 
                 return [
                     'id' => $servicio->id,
@@ -142,8 +144,10 @@ class ReporteService
                     'precio' => $precio,
                     'precio_bs' => $precioBs,
                     'comision_porcentaje' => $comision,
-                    'comision' => round($precio * ($comision / 100), 2),
-                    'comision_bs' => round($precioBs * ($comision / 100), 2),
+                    'comision_tipo' => $comisionTipo,
+                    'comision_monto' => $comisionMonto,
+                    'comision' => $comisionMonto,
+                    'comision_bs' => $precio > 0 ? round($precioBs * ($comisionMonto / $precio), 2) : 0,
                 ];
             })->values()->all();
 

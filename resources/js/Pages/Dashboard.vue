@@ -315,15 +315,22 @@
                             </select>
                           </div>
                           <div class="col-3">
-                            <label class="form-label small text-muted mb-1">Comisión (%)</label>
+                            <label class="form-label small text-muted mb-1">Tipo de comisión</label>
+                            <select class="form-select form-select-sm" v-model="formTurno.servicio_comision_tipos[s.id]">
+                              <option value="porcentaje">Porcentaje</option>
+                              <option value="monto">Monto</option>
+                            </select>
+                          </div>
+                          <div class="col-3">
+                            <label class="form-label small text-muted mb-1">{{ formTurno.servicio_comision_tipos[s.id] === 'monto' ? 'Gana especialista ($)' : 'Comisión (%)' }}</label>
                             <input
                               type="number"
                               min="0"
-                              max="100"
+                              :max="formTurno.servicio_comision_tipos[s.id] === 'monto' ? undefined : 100"
                               step="0.01"
                               class="form-control form-control-sm"
-                              :value="formTurno.servicio_comisiones[s.id] ?? getEspecialistaComision(s)"
-                              @input="formTurno.servicio_comisiones[s.id] = Number($event.target.value) || 0"
+                              :value="formTurno.servicio_comision_tipos[s.id] === 'monto' ? (formTurno.servicio_comision_montos[s.id] ?? 0) : (formTurno.servicio_comisiones[s.id] ?? getEspecialistaComision(s))"
+                              @input="formTurno.servicio_comision_tipos[s.id] === 'monto' ? formTurno.servicio_comision_montos[s.id] = Number($event.target.value) || 0 : formTurno.servicio_comisiones[s.id] = Number($event.target.value) || 0"
                             >
                           </div>
                           <div class="col-3">
@@ -702,12 +709,19 @@
                         <div class="col-md-6">
                           <label class="form-label small text-muted mb-1">Especialista del servicio</label>
                           <select class="form-select form-select-sm" v-model.number="citaEditForm.servicio_especialistas[servicio.id]">
-                            <option v-for="especialista in (servicio.especialistas || [])" :key="especialista.id" :value="especialista.id">{{ especialista.name }} ({{ Number(especialista.comision || 0).toFixed(2) }}%)</option>
+                            <option v-for="especialista in getEspecialistasEdicion(servicio)" :key="especialista.id" :value="especialista.id">{{ especialista.name }} ({{ Number(especialista.comision || 0).toFixed(2) }}%)</option>
                           </select>
                         </div>
-                        <div class="col-md-3">
-                          <label class="form-label small text-muted mb-1">Comisión (%)</label>
-                          <input type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" v-model.number="citaEditForm.servicio_comisiones[servicio.id]">
+                          <div class="col-md-3">
+                            <label class="form-label small text-muted mb-1">Tipo de comisión</label>
+                            <select class="form-select form-select-sm" v-model="citaEditForm.servicio_comision_tipos[servicio.id]">
+                              <option value="porcentaje">Porcentaje</option>
+                              <option value="monto">Monto</option>
+                            </select>
+                          </div>
+                          <div class="col-md-3">
+                            <label class="form-label small text-muted mb-1">{{ citaEditForm.servicio_comision_tipos[servicio.id] === 'monto' ? 'Gana especialista ($)' : 'Comisión (%)' }}</label>
+                            <input type="number" min="0" :max="citaEditForm.servicio_comision_tipos[servicio.id] === 'monto' ? undefined : 100" step="0.01" class="form-control form-control-sm" :value="citaEditForm.servicio_comision_tipos[servicio.id] === 'monto' ? (citaEditForm.servicio_comision_montos[servicio.id] ?? 0) : (citaEditForm.servicio_comisiones[servicio.id] ?? 0)" @input="citaEditForm.servicio_comision_tipos[servicio.id] === 'monto' ? citaEditForm.servicio_comision_montos[servicio.id] = Number($event.target.value) || 0 : citaEditForm.servicio_comisiones[servicio.id] = Number($event.target.value) || 0">
                         </div>
                         <div class="col-md-3">
                           <label class="form-label small text-muted mb-1">Precio manual</label>
@@ -822,6 +836,8 @@ const citaEditForm = useForm({
   servicios: [],
   servicio_especialistas: {},
   servicio_comisiones: {},
+  servicio_comision_tipos: {},
+  servicio_comision_montos: {},
   precios_servicios: {},
   fecha: '',
   hora_inicio: '',
@@ -831,6 +847,20 @@ const citaEditForm = useForm({
 const serviciosEdicion = computed(() => {
   return props.servicios_lista || [];
 });
+
+const getEspecialistasEdicion = (servicio) => {
+  const idsPermitidos = [citaEditForm.especialista_id, citaEditForm.asistente_id]
+    .map((id) => Number(id || 0))
+    .filter(Boolean);
+  const especialistas = props.especialistas_lista || [];
+  const relacionados = servicio.especialistas || [];
+  const opciones = idsPermitidos.map((id) => {
+    return especialistas.find((especialista) => Number(especialista.id) === id)
+      || relacionados.find((especialista) => Number(especialista.id) === id);
+  }).filter(Boolean);
+
+  return opciones.filter((especialista, index) => opciones.findIndex((item) => Number(item.id) === Number(especialista.id)) === index);
+};
 
 const verDetalleCita = (cita) => {
   citaSeleccionada.value = cita;
@@ -856,6 +886,8 @@ const abrirEdicionCita = (cita) => {
     servicio.id,
     Number(servicio.comision_porcentaje || 0)
   ]));
+  citaEditForm.servicio_comision_tipos = Object.fromEntries((cita.servicios_detalle || []).map((servicio) => [servicio.id, servicio.comision_tipo || 'porcentaje']));
+  citaEditForm.servicio_comision_montos = Object.fromEntries((cita.servicios_detalle || []).map((servicio) => [servicio.id, Number(servicio.comision_monto || 0)]));
   citaEditForm.precios_servicios = Object.fromEntries((cita.servicios_detalle || []).map((servicio) => [
     servicio.id,
     Number(servicio.precio || 0)
@@ -937,6 +969,8 @@ const formTurno = useForm({
   precios_servicios: {},
   servicio_especialistas: {},
   servicio_comisiones: {},
+  servicio_comision_tipos: {},
+  servicio_comision_montos: {},
   fecha: props.filters?.fecha || new Date().toISOString().substr(0, 10),
   hora_inicio: '08:00',
   holgura_min: 15,
@@ -1037,6 +1071,12 @@ watch(
   () => serviciosState.value.filter((s) => s.selected).map((s) => s.id),
   (ids) => {
     ids.forEach((id) => {
+      if (!formTurno.servicio_comision_tipos[id]) {
+        formTurno.servicio_comision_tipos[id] = 'porcentaje';
+      }
+      if (formTurno.servicio_comision_montos[id] === undefined) {
+        formTurno.servicio_comision_montos[id] = 0;
+      }
       if (formTurno.servicio_comisiones[id] === undefined || formTurno.servicio_comisiones[id] === null || formTurno.servicio_comisiones[id] === '') {
         const servicio = serviciosState.value.find((s) => Number(s.id) === Number(id));
         if (servicio) {
@@ -1108,9 +1148,12 @@ const resumenGananciasEspecialistas = computed(() => {
     const esp = getEspecialistaActual(s);
     const espId = esp ? esp.id : (formTurno.especialista_id || 0);
     const espNombre = esp ? esp.name : 'Especialista';
-    const comisionPct = Number(formTurno.servicio_comisiones?.[s.id] ?? getEspecialistaComision(s) ?? 0);
     const precioUsd = getServicioPrecioBase(s) * (s.es_recurrente === true ? 1 : sesionesSeleccionadas.value);
-    const gananciaUsd = precioUsd * (comisionPct / 100);
+    const tipoComision = formTurno.servicio_comision_tipos?.[s.id] ?? 'porcentaje';
+    const comisionPct = Number(formTurno.servicio_comisiones?.[s.id] ?? getEspecialistaComision(s) ?? 0);
+    const gananciaUsd = tipoComision === 'monto'
+      ? Number(formTurno.servicio_comision_montos?.[s.id] ?? 0) * (s.es_recurrente === true ? 1 : sesionesSeleccionadas.value)
+      : precioUsd * (comisionPct / 100);
 
     if (!map[espId]) {
       map[espId] = {
@@ -1147,6 +1190,12 @@ const guardarTurno = () => {
     serviciosState.value
       .filter(s => s.selected)
       .map(s => [s.id, Number(formTurno.servicio_comisiones?.[s.id] ?? getEspecialistaComision(s) ?? 0)])
+  );
+  formTurno.servicio_comision_tipos = Object.fromEntries(
+    serviciosState.value.filter(s => s.selected).map(s => [s.id, formTurno.servicio_comision_tipos?.[s.id] ?? 'porcentaje'])
+  );
+  formTurno.servicio_comision_montos = Object.fromEntries(
+    serviciosState.value.filter(s => s.selected).map(s => [s.id, Number(formTurno.servicio_comision_montos?.[s.id] ?? 0)])
   );
 
   if (!formTurno.asistente_id) {
