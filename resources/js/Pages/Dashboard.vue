@@ -662,6 +662,17 @@
                     <option v-for="especialista in especialistas_lista" :key="especialista.id" :value="especialista.id">{{ especialista.name }}</option>
                   </select>
                 </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-medium">Asistente (opcional)</label>
+                  <select class="form-select" v-model="citaEditForm.asistente_id">
+                    <option value="">Sin asistente</option>
+                    <option v-for="especialista in especialistas_lista" :key="especialista.id" :value="especialista.id" :disabled="Number(especialista.id) === Number(citaEditForm.especialista_id)">{{ especialista.name }}</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-medium">Comisión del asistente (%)</label>
+                  <input type="number" min="0" max="100" step="0.01" class="form-control" v-model.number="citaEditForm.comision_asistente" :disabled="!citaEditForm.asistente_id">
+                </div>
                 <div class="col-md-4">
                   <label class="form-label fw-medium">Fecha</label>
                   <input type="date" class="form-control" v-model="citaEditForm.fecha" required>
@@ -681,12 +692,28 @@
                 <div class="col-12">
                   <label class="form-label fw-medium">Servicios</label>
                   <div class="border rounded p-3 bg-light">
-                    <div v-for="servicio in serviciosEdicion" :key="servicio.id" class="form-check mb-2">
+                    <div v-for="servicio in serviciosEdicion" :key="servicio.id" class="form-check mb-3">
                       <input class="form-check-input" type="checkbox" :id="'srv-edit-dash-'+servicio.id" :value="servicio.id" v-model="citaEditForm.servicios">
                       <label class="form-check-label d-flex justify-content-between w-100" :for="'srv-edit-dash-'+servicio.id">
                         <span>{{ servicio.nombre }} ({{ servicio.duracion }} min)</span>
-                        <strong>${{ servicio.precio.toFixed(2) }}</strong>
+                        <strong>${{ Number(citaEditForm.precios_servicios[servicio.id] ?? servicio.precio).toFixed(2) }}</strong>
                       </label>
+                      <div v-if="citaEditForm.servicios.includes(Number(servicio.id))" class="row g-2 mt-1 ms-4">
+                        <div class="col-md-6">
+                          <label class="form-label small text-muted mb-1">Especialista del servicio</label>
+                          <select class="form-select form-select-sm" v-model.number="citaEditForm.servicio_especialistas[servicio.id]">
+                            <option v-for="especialista in (servicio.especialistas || [])" :key="especialista.id" :value="especialista.id">{{ especialista.name }} ({{ Number(especialista.comision || 0).toFixed(2) }}%)</option>
+                          </select>
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label small text-muted mb-1">Comisión (%)</label>
+                          <input type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" v-model.number="citaEditForm.servicio_comisiones[servicio.id]">
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label small text-muted mb-1">Precio manual</label>
+                          <input type="number" min="0" step="0.01" class="form-control form-control-sm" v-model.number="citaEditForm.precios_servicios[servicio.id]">
+                        </div>
+                      </div>
                     </div>
                     <span v-if="!serviciosEdicion.length" class="text-muted small">No hay servicios asignados a este especialista.</span>
                   </div>
@@ -790,6 +817,8 @@ const estadoForm = useForm({
 const citaEditForm = useForm({
   paciente_id: '',
   especialista_id: '',
+  asistente_id: '',
+  comision_asistente: 0,
   servicios: [],
   servicio_especialistas: {},
   servicio_comisiones: {},
@@ -800,10 +829,7 @@ const citaEditForm = useForm({
 });
 
 const serviciosEdicion = computed(() => {
-  const especialistaId = Number(citaEditForm.especialista_id || 0);
-  return (props.servicios_lista || []).filter((servicio) => {
-    return !especialistaId || (servicio.especialistas || []).some((especialista) => Number(especialista.id) === especialistaId);
-  });
+  return props.servicios_lista || [];
 });
 
 const verDetalleCita = (cita) => {
@@ -816,10 +842,24 @@ const abrirEdicionCita = (cita) => {
   citaSeleccionada.value = cita;
   citaEditForm.paciente_id = cita.paciente_id;
   citaEditForm.especialista_id = cita.especialista_id;
+  citaEditForm.asistente_id = cita.asistente_id || '';
+  citaEditForm.comision_asistente = Number(cita.comision_asistente_porcentaje || 0);
   citaEditForm.servicios = (cita.servicio_ids || []).map((id) => Number(id));
-  citaEditForm.fecha = props.filters?.fecha || new Date().toISOString().substr(0, 10);
+  citaEditForm.fecha = cita.fecha || props.filters?.fecha || new Date().toISOString().substr(0, 10);
   citaEditForm.hora_inicio = convertirHoraA24(cita.hora_inicio || cita.hora || '08:00');
-  citaEditForm.holgura_min = 15;
+  citaEditForm.holgura_min = Number(cita.holgura_min ?? 15);
+  citaEditForm.servicio_especialistas = Object.fromEntries((cita.servicios_detalle || []).map((servicio) => [
+    servicio.id,
+    Number(servicio.especialista_id || cita.especialista_id)
+  ]));
+  citaEditForm.servicio_comisiones = Object.fromEntries((cita.servicios_detalle || []).map((servicio) => [
+    servicio.id,
+    Number(servicio.comision_porcentaje || 0)
+  ]));
+  citaEditForm.precios_servicios = Object.fromEntries((cita.servicios_detalle || []).map((servicio) => [
+    servicio.id,
+    Number(servicio.precio || 0)
+  ]));
   citaEditForm.clearErrors();
 };
 

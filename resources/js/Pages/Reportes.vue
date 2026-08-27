@@ -153,8 +153,16 @@
                 <td>{{ agenda.fecha }}</td>
                 <td>{{ agenda.hora }}</td>
                 <td class="fw-bold text-ayla-dark">{{ agenda.paciente }}</td>
-                <td>{{ agenda.servicio }}</td>
-                <td>{{ agenda.asistente ? `${agenda.asistente} (3%)` : 'Sin asistente' }}</td>
+                <td>
+                  <div v-if="agenda.servicios_detalle?.length" class="small">
+                    <div v-for="servicio in agenda.servicios_detalle" :key="`${agenda.id}-${servicio.id}`" class="border-bottom py-1">
+                      <strong>{{ servicio.nombre }}</strong> · {{ servicio.especialista }}<br>
+                      <span>${{ Number(servicio.precio || 0).toFixed(2) }} (Bs. {{ formatoBs(servicio.precio_bs) }}) · Comisión {{ Number(servicio.comision_porcentaje || 0).toFixed(2) }}%: ${{ Number(servicio.comision || 0).toFixed(2) }}</span>
+                    </div>
+                  </div>
+                  <span v-else>{{ agenda.servicio }}</span>
+                </td>
+                <td>{{ agenda.asistente ? `${agenda.asistente} (${Number(agenda.comision_asistente_porcentaje || 0).toFixed(2)}%)` : 'Sin asistente' }}</td>
                 <td><span class="badge bg-ayla-rose">{{ agenda.estado }}</span></td>
                 <td class="text-end fw-bold">${{ Number(agenda.monto).toFixed(2) }}<br><span class="small text-ayla-rose">Bs. {{ formatoBs(agenda.monto_bs) }}</span></td>
               </tr>

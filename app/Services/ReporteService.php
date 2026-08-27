@@ -126,12 +126,34 @@ class ReporteService
         $totalNegocioBs = round(array_sum(array_column($auditoria, 'ganancia_negocio_bs')), 2);
 
         $agendas = $citas->sortByDesc('fecha')->values()->map(function ($cita) {
+            $serviciosDetalle = $cita->servicios->map(function ($servicio) use ($cita) {
+                $especialistaId = (int) ($servicio->pivot->especialista_id ?: $cita->user_id);
+                $especialista = $especialistaId === (int) $cita->user_id
+                    ? $cita->especialista
+                    : User::find($especialistaId);
+                $precio = (float) ($servicio->pivot->precio_momento ?? 0);
+                $precioBs = (float) ($servicio->pivot->monto_bs_momento ?? 0);
+                $comision = (float) ($servicio->pivot->comision_momento ?? ($especialista?->comision ?? 0));
+
+                return [
+                    'id' => $servicio->id,
+                    'nombre' => $servicio->nombre,
+                    'especialista' => $especialista?->name ?? 'Sin especialista',
+                    'precio' => $precio,
+                    'precio_bs' => $precioBs,
+                    'comision_porcentaje' => $comision,
+                    'comision' => round($precio * ($comision / 100), 2),
+                    'comision_bs' => round($precioBs * ($comision / 100), 2),
+                ];
+            })->values()->all();
+
             return [
                 'id' => $cita->id,
                 'fecha' => $cita->fecha?->format('d/m/Y'),
                 'hora' => $cita->hora_inicio ? substr((string) $cita->hora_inicio, 0, 5) : 'N/A',
                 'paciente' => $cita->paciente?->nombre ?? 'Sin paciente',
                 'servicio' => $cita->servicios->pluck('nombre')->join(', ') ?: 'Sin servicio',
+                'servicios_detalle' => $serviciosDetalle,
                 'asistente' => $cita->asistente?->name,
                 'comision_asistente_porcentaje' => (float) ($cita->comision_asistente_porcentaje ?? 0),
                 'estado' => $cita->estado,

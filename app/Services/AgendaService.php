@@ -79,6 +79,7 @@ class AgendaService
 
             return [
                 'id' => $cita->id,
+                'fecha' => $cita->fecha ? Carbon::parse($cita->fecha)->format('Y-m-d') : null,
                 'hora_inicio' => $cita->hora_inicio ? Carbon::parse($cita->hora_inicio)->format('h:i A') : '',
                 'hora_fin' => $cita->hora_fin ? Carbon::parse($cita->hora_fin)->format('h:i A') : '',
                 'duracion_min' => $duracion > 0 ? $duracion : (int) ($cita->holgura_min ?? 0),
@@ -92,6 +93,7 @@ class AgendaService
                 'asistente' => $cita->asistente?->name,
                 'asistente_id' => $cita->asistente_id,
                 'comision_asistente_porcentaje' => (float) ($cita->comision_asistente_porcentaje ?? 0),
+                'holgura_min' => (int) ($cita->holgura_min ?? 15),
                 'monto_asistente' => $montoAsistente,
                 'monto_asistente_bs' => $montoAsistenteBs,
                 'monto' => (float) ($cita->monto_total ?? 0),

@@ -224,7 +224,7 @@ class AgendaController extends Controller
             $validated = $request->validate([
                 'paciente_id' => 'required|exists:pacientes,id',
                 'especialista_id' => 'required|exists:users,id',
-                'asistente_id' => 'nullable|exists:users,id',
+                'asistente_id' => 'nullable|exists:users,id|different:especialista_id',
                 'comision_asistente' => 'nullable|numeric|min:0|max:100',
                 'servicios' => 'required|array|min:1',
                 'servicios.*' => 'integer|exists:servicios,id',
@@ -240,6 +240,10 @@ class AgendaController extends Controller
             ]);
 
             $servicios = Servicio::whereIn('id', $validated['servicios'])->get();
+            if (!empty($validated['asistente_id'])) {
+                abort_unless(User::whereKey($validated['asistente_id'])->where('role', 'especialista')->exists(), 422, 'El asistente debe ser un especialista.');
+            }
+
             $duracionTotal = $servicios->sum(fn ($servicio) => (int) ($servicio->duracion_min ?? 0));
             $conflicto = $this->buscarConflicto(
                 $validated['paciente_id'],

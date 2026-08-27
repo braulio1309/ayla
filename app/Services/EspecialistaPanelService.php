@@ -38,7 +38,7 @@ class EspecialistaPanelService
                 if ($espId === (int) $usuarioId) {
                     $precioUsd = (float) ($srv->pivot->precio_momento ?? 0);
                     $precioBs = (float) ($srv->pivot->monto_bs_momento ?? 0);
-                    $comisionPct = (float) ($srv->pivot->comision_momento ?? ($usuario ? $usuario->comision : 0));
+                    $comisionPct = (float) ($srv->pivot->comision_momento ?? ($usuario->comision ?? 0));
 
                     $totalGenerado += $precioUsd;
                     $totalGeneradoBs += $precioBs;
@@ -100,7 +100,7 @@ class EspecialistaPanelService
                     $espId = (int) ($srv->pivot->especialista_id ?: $cita->user_id);
                     $montoServicio = (float) ($srv->pivot->precio_momento ?? 0);
                     $montoServicioBs = (float) ($srv->pivot->monto_bs_momento ?? 0);
-                    $comisionPct = (float) ($srv->pivot->comision_momento ?? ($usuario ? $usuario->comision : 0));
+                    $comisionPct = (float) ($srv->pivot->comision_momento ?? ($usuario->comision ?? 0));
 
                     $esMiServicio = $espId === (int) $usuarioId;
                     $miGanancia = $esMiServicio ? round($montoServicio * ($comisionPct / 100), 2) : 0;

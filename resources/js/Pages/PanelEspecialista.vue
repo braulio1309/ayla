@@ -94,6 +94,9 @@
                       <div v-if="s.es_mi_servicio" class="text-success fw-medium">
                         Mi ganancia ({{ Number(s.comision_porcentaje || 0).toFixed(2) }}%): ${{ Number(s.mi_ganancia || 0).toFixed(2) }} (Bs. {{ formatoBs(s.mi_ganancia_bs) }})
                       </div>
+                      <div v-else class="text-muted fw-medium">
+                        Otros servicios: ${{ Number(s.monto_total || 0).toFixed(2) }} (Bs. {{ formatoBs(s.monto_total_bs) }})
+                      </div>
                     </div>
                   </div>
                   <div v-else class="small text-muted">{{ a.servicio }}</div>
@@ -114,7 +117,7 @@
                   <br><span class="small text-ayla-rose">Bs. {{ formatoBs(a.monto_bs) }}</span>
                 </td>
                 <td class="text-end fw-bold text-success fs-6">
-                  ${{ Number(a.mi_ganancia_total ?? (a.ganancia_servicios + a.ganancia_asistente) ?? 0).toFixed(2) }}
+                  ${{ Number(a.mi_ganancia_total ?? (Number(a.ganancia_servicios || 0) + Number(a.ganancia_asistente || 0))).toFixed(2) }}
                   <br><span class="small text-ayla-rose fw-normal">Bs. {{ formatoBs(a.mi_ganancia_total_bs) }}</span>
                 </td>
               </tr>
@@ -154,6 +157,8 @@ const totalGeneradoSeguro = computed(() => Number(props.total_generado ?? 0));
 const totalGeneradoBsSeguro = computed(() => Number(props.total_generado_bs ?? 0));
 const comisionTotalSeguro = computed(() => Number(props.comision_total ?? 0));
 const comisionTotalBsSeguro = computed(() => Number(props.comision_total_bs ?? 0));
+const comisionAsistenteSeguro = computed(() => Number(props.comision_asistente ?? 0));
+const comisionAsistenteBsSeguro = computed(() => Number(props.comision_asistente_bs ?? 0));
 const atencionesSeguras = computed(() => props.atenciones || []);
 
 const formatoBs = (monto) => Number(monto ?? 0).toLocaleString('es-VE', {
