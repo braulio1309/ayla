@@ -55,6 +55,10 @@ Route::middleware(['auth'])->group(function () {
     // Módulo de Reportes
     Route::get('/reportes', [ReporteController::class, 'index'])->name('reportes.index');
     Route::get('/reportes/exportar', [ReporteController::class, 'exportar'])->name('reportes.exportar');
+    Route::post('/reportes/ayla-adicionales', [ReporteController::class, 'storeAylaAdicional'])
+        ->name('reportes.ayla-adicionales.store');
+    Route::post('/reportes/pagos-semanales', [ReporteController::class, 'storePagoSemanal'])
+        ->name('reportes.pagos-semanales.store');
 
     // Perfil (Breeze)
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

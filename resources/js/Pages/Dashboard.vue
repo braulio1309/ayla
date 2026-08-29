@@ -307,7 +307,7 @@
                             <select
                               class="form-select form-select-sm"
                               :value="formTurno.servicio_especialistas[s.id] ?? getServicioEspecialistaDefault(s)"
-                              @change="formTurno.servicio_especialistas[s.id] = Number($event.target.value) || Number(formTurno.especialista_id || 0)"
+                              @change="seleccionarEspecialistaServicio(s, $event.target.value)"
                             >
                               <option v-for="especialista in getEspecialistasServicioDisponibles(s)" :key="especialista.id" :value="especialista.id">
                                 {{ especialista.name }} ({{ Number(especialista.comision || 0).toFixed(2) }}%)
@@ -1004,6 +1004,16 @@ const getEspecialistaActual = (servicio) => {
 
 const getEspecialistaComision = (servicio) => {
   return Number(getEspecialistaActual(servicio)?.comision ?? 0);
+};
+
+const seleccionarEspecialistaServicio = (servicio, especialistaId) => {
+  const id = Number(especialistaId) || Number(formTurno.especialista_id || 0);
+  const especialista = (props.especialistas_lista || []).find((item) => Number(item.id) === id);
+
+  formTurno.servicio_especialistas[servicio.id] = id;
+  formTurno.servicio_comision_tipos[servicio.id] = 'porcentaje';
+  formTurno.servicio_comisiones[servicio.id] = Number(especialista?.comision || 0);
+  formTurno.servicio_comision_montos[servicio.id] = 0;
 };
 
 const getServicioEspecialistaDefault = (servicio) => {
