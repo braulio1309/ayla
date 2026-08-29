@@ -289,8 +289,8 @@ class ReporteService
             'kpis' => [
                 'ingresos_brutos' => $totalGeneral,
                 'ingresos_brutos_bs' => $totalGeneralBs,
-                'total_comision_especialistas' => $totalComisionEspecialistas,
-                'total_comision_especialistas_bs' => $totalComisionEspecialistasBs,
+                'total_comision_especialistas' => round($totalComisionEspecialistas + $totalComisionAsistentes, 2),
+                'total_comision_especialistas_bs' => round($totalComisionEspecialistasBs + $totalComisionAsistentesBs, 2),
                 'total_comision_asistentes' => $totalComisionAsistentes,
                 'total_comision_asistentes_bs' => $totalComisionAsistentesBs,
                 'total_negocio' => $totalNegocio,
