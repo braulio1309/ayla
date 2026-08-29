@@ -31,7 +31,7 @@ class ReporteService
             'servicios' => function ($query) {
                 $query->select('servicios.id', 'servicios.nombre');
             },
-        ]);
+        ])->where('estado', 'completado');
 
         $rango = $this->resolverRangoPeriodo($periodo);
         if ($rango) {
