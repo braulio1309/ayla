@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Cita;
 use App\Models\Servicio;
 use App\Models\User;
+use Carbon\Carbon;
 
 class ReporteService
 {
@@ -26,6 +27,11 @@ class ReporteService
                 $query->select('servicios.id', 'servicios.nombre');
             },
         ]);
+
+        $rango = $this->resolverRangoPeriodo($periodo);
+        if ($rango) {
+            $citas->whereBetween('fecha', [$rango['inicio'], $rango['fin']]);
+        }
 
         if ($especialistaId) {
             $citas->where('user_id', $especialistaId);
@@ -198,5 +204,62 @@ class ReporteService
                 'nombre' => $s->nombre,
             ])->all(),
         ];
+    }
+
+    private function resolverRangoPeriodo(string $periodo): ?array
+    {
+        $periodoNormalizado = strtolower(trim($periodo));
+
+        if ($periodoNormalizado === 'hoy') {
+            $hoy = Carbon::today();
+
+            return [
+                'inicio' => $hoy->format('Y-m-d'),
+                'fin' => $hoy->format('Y-m-d'),
+            ];
+        }
+
+        if ($periodoNormalizado === 'semanal') {
+            $inicio = Carbon::now()->startOfWeek(Carbon::MONDAY);
+            $fin = $inicio->copy()->addDays(5);
+
+            return [
+                'inicio' => $inicio->format('Y-m-d'),
+                'fin' => $fin->format('Y-m-d'),
+            ];
+        }
+
+        if ($periodoNormalizado === 'anual') {
+            $inicio = Carbon::now()->startOfYear();
+            $fin = Carbon::now()->endOfYear();
+
+            return [
+                'inicio' => $inicio->format('Y-m-d'),
+                'fin' => $fin->format('Y-m-d'),
+            ];
+        }
+
+        if (preg_match('/^([a-z]+)_(\d{4})$/', $periodoNormalizado, $coincidencias)) {
+            $mesMap = [
+                'enero' => 1, 'febrero' => 2, 'marzo' => 3, 'abril' => 4, 'mayo' => 5, 'junio' => 6,
+                'julio' => 7, 'agosto' => 8, 'septiembre' => 9, 'setiembre' => 9, 'octubre' => 10,
+                'noviembre' => 11, 'diciembre' => 12,
+            ];
+
+            $mes = $mesMap[$coincidencias[1]] ?? null;
+            $anio = (int) $coincidencias[2];
+
+            if ($mes) {
+                $inicio = Carbon::create($anio, $mes, 1, 0, 0, 0);
+                $fin = $inicio->copy()->endOfMonth();
+
+                return [
+                    'inicio' => $inicio->format('Y-m-d'),
+                    'fin' => $fin->format('Y-m-d'),
+                ];
+            }
+        }
+
+        return null;
     }
 }

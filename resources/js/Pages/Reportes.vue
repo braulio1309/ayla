@@ -24,6 +24,7 @@
           <div class="col-md-3">
             <label class="form-label small text-muted mb-1">Intervalo de Tiempo</label>
             <select class="form-select" v-model="filterForm.periodo">
+              <option value="hoy">Hoy</option>
               <option value="agosto_2026">Mensual (Agosto 2026)</option>
               <option value="julio_2026">Mensual (Julio 2026)</option>
               <option value="semanal">Semana Actual</option>
@@ -143,6 +144,7 @@
                 <th>Hora</th>
                 <th>Paciente</th>
                 <th>Servicio</th>
+                <th class="text-end">Total ganado en servicios</th>
                 <th>Asistente</th>
                 <th>Estado</th>
                 <th class="text-end">Monto</th>
@@ -159,15 +161,23 @@
                       <strong>{{ servicio.nombre }}</strong> · {{ servicio.especialista }}<br>
                       <span>${{ Number(servicio.precio || 0).toFixed(2) }} (Bs. {{ formatoBs(servicio.precio_bs) }}) · Comisión {{ Number(servicio.comision_porcentaje || 0).toFixed(2) }}%: ${{ Number(servicio.comision || 0).toFixed(2) }}</span>
                     </div>
+                    <div class="mt-2 text-success fw-bold border-top pt-2">
+                      Total ganado en servicios: ${{ totalGanadoServiciosAgenda(agenda).toFixed(2) }}
+                      <span class="text-ayla-rose small">(Bs. {{ formatoBs(totalGanadoServiciosAgendaBs(agenda)) }})</span>
+                    </div>
                   </div>
                   <span v-else>{{ agenda.servicio }}</span>
+                </td>
+                <td class="text-end fw-bold text-success">
+                  ${{ Number(totalGanadoServiciosAgenda(agenda) || 0).toFixed(2) }}
+                  <br><span class="small text-ayla-rose fw-normal">Bs. {{ formatoBs(totalGanadoServiciosAgendaBs(agenda)) }}</span>
                 </td>
                 <td>{{ agenda.asistente ? `${agenda.asistente} (${Number(agenda.comision_asistente_porcentaje || 0).toFixed(2)}%)` : 'Sin asistente' }}</td>
                 <td><span class="badge bg-ayla-rose">{{ agenda.estado }}</span></td>
                 <td class="text-end fw-bold">${{ Number(agenda.monto).toFixed(2) }}<br><span class="small text-ayla-rose">Bs. {{ formatoBs(agenda.monto_bs) }}</span></td>
               </tr>
               <tr v-if="agendas.length === 0">
-                <td colspan="7" class="text-center py-4 text-muted">No hay agendas para los filtros seleccionados.</td>
+                <td colspan="8" class="text-center py-4 text-muted">No hay agendas para los filtros seleccionados.</td>
               </tr>
             </tbody>
           </table>
@@ -206,6 +216,16 @@ const formatoBs = (monto) => Number(monto || 0).toLocaleString('es-VE', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2
 });
+
+const totalGanadoServiciosAgenda = (agenda) => {
+  const servicios = Array.isArray(agenda?.servicios_detalle) ? agenda.servicios_detalle : [];
+  return servicios.reduce((total, servicio) => total + Number(servicio?.comision || 0), 0);
+};
+
+const totalGanadoServiciosAgendaBs = (agenda) => {
+  const servicios = Array.isArray(agenda?.servicios_detalle) ? agenda.servicios_detalle : [];
+  return servicios.reduce((total, servicio) => total + Number(servicio?.comision_bs || 0), 0);
+};
 
 const exportarExcel = () => {
   const parametros = new URLSearchParams({

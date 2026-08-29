@@ -64,6 +64,41 @@ class AgendaStatusUpdateTest extends TestCase
         $response->assertRedirect('/panel-especialista');
     }
 
+    public function test_admin_can_update_an_existing_patient(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+        ]);
+
+        $paciente = Paciente::create([
+            'nombre' => 'Ana López',
+            'cedula' => '12345678',
+            'telefono' => '0999999999',
+            'email' => 'ana@example.com',
+            'notas' => 'Paciente activa',
+        ]);
+
+        $response = $this->actingAs($admin)->put('/pacientes/' . $paciente->id, [
+            'nombre' => 'Ana López Updated',
+            'cedula' => '87654321',
+            'telefono' => '+58 412 555 0001',
+            'email' => 'ana.updated@example.com',
+            'notas' => 'Paciente con nueva información',
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success', 'Paciente actualizado correctamente.');
+
+        $this->assertDatabaseHas('pacientes', [
+            'id' => $paciente->id,
+            'nombre' => 'Ana López Updated',
+            'cedula' => '87654321',
+            'telefono' => '+58 412 555 0001',
+            'email' => 'ana.updated@example.com',
+            'notas' => 'Paciente con nueva información',
+        ]);
+    }
+
     public function test_especialista_cannot_access_general_patient_list(): void
     {
         $especialista = User::factory()->create([

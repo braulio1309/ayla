@@ -38,6 +38,7 @@ Route::middleware(['auth'])->group(function () {
         return app(PacienteController::class)->index(request());
     })->name('pacientes.index');
     Route::post('/pacientes', [PacienteController::class, 'store'])->name('pacientes.store');
+    Route::put('/pacientes/{paciente}', [PacienteController::class, 'update'])->name('pacientes.update');
 
     // Módulo de Servicios
     Route::get('/servicios', [ServicioController::class, 'index'])->name('servicios.index');

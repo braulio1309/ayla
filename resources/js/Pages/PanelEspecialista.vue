@@ -50,11 +50,14 @@
           </div>
           <div class="col-md-4">
             <label class="form-label small text-muted mb-1">Fecha Fin</label>
-            <input type="date" class="form-control" v-model="filterForm.fecha_fin">
+            <input type="date" class="form-control" v-model="filterForm.fecha_fin" :min="filterForm.fecha_inicio">
           </div>
-          <div class="col-md-2 align-self-end">
+          <div class="col-md-2 align-self-end d-flex gap-2">
             <button type="button" class="btn btn-outline-secondary w-100 py-2" @click="verHoy">
               <i class="bi bi-calendar-day me-1"></i> Hoy
+            </button>
+            <button type="button" class="btn btn-outline-secondary w-100 py-2" @click="verSemanaActual">
+              <i class="bi bi-calendar-week me-1"></i> Semana
             </button>
           </div>
           <div class="col-md-2 align-self-end">
@@ -75,6 +78,7 @@
                 <th>Fecha</th>
                 <th>Paciente Atendido</th>
                 <th>Desglose de Servicios / Asistencia</th>
+                <th class="text-end">Total ganado en servicios</th>
                 <th>Rol</th>
                 <th class="text-end">Monto Total Cita</th>
                 <th class="text-end">Mi Ganancia Total</th>
@@ -101,10 +105,20 @@
                   </div>
                   <div v-else class="small text-muted">{{ a.servicio }}</div>
 
+                  <div v-if="a.servicios_detalle && a.servicios_detalle.length" class="mt-2 small text-success fw-medium border-top pt-2">
+                    <i class="bi bi-currency-dollar me-1"></i>Total ganado en servicios:
+                    <span class="fw-bold">${{ totalGanadoEnServicios(a).toFixed(2) }}</span>
+                    <span class="text-ayla-rose">(Bs. {{ formatoBs(totalGanadoEnServiciosBs(a)) }})</span>
+                  </div>
+
                   <div v-if="a.es_asistente" class="mt-1 text-ayla-dark fw-medium small">
                     <i class="bi bi-person-badge me-1"></i>Ganancia por asistencia ({{ Number(a.comision_asistente_porcentaje || 0).toFixed(2) }}%):
                     <span class="text-success fw-bold">+${{ Number(a.ganancia_asistente || 0).toFixed(2) }} (Bs. {{ formatoBs(a.ganancia_asistente_bs) }})</span>
                   </div>
+                </td>
+                <td class="text-end fw-bold text-success">
+                  ${{ Number(totalGanadoEnServicios(a) || 0).toFixed(2) }}
+                  <br><span class="small text-ayla-rose fw-normal">Bs. {{ formatoBs(totalGanadoEnServiciosBs(a)) }}</span>
                 </td>
                 <td>
                   <div class="d-flex flex-column gap-1 align-items-start">
@@ -122,7 +136,7 @@
                 </td>
               </tr>
               <tr v-if="atencionesSeguras.length === 0">
-                <td colspan="6" class="text-center py-4 text-muted">
+                <td colspan="7" class="text-center py-4 text-muted">
                   No se registraron atenciones en el intervalo de fechas seleccionado.
                 </td>
               </tr>
@@ -166,17 +180,55 @@ const formatoBs = (monto) => Number(monto ?? 0).toLocaleString('es-VE', {
   maximumFractionDigits: 2,
 });
 
+const totalGanadoEnServicios = (atencion) => {
+  const servicios = Array.isArray(atencion?.servicios_detalle) ? atencion.servicios_detalle : [];
+  return servicios.reduce((total, servicio) => {
+    const valor = Number(servicio?.mi_ganancia ?? servicio?.comision ?? 0);
+    return total + valor;
+  }, 0);
+};
+
+const totalGanadoEnServiciosBs = (atencion) => {
+  const servicios = Array.isArray(atencion?.servicios_detalle) ? atencion.servicios_detalle : [];
+  return servicios.reduce((total, servicio) => {
+    const valor = Number(servicio?.mi_ganancia_bs ?? 0);
+    return total + valor;
+  }, 0);
+};
+
+const fechaLocal = (fecha) => {
+  const anio = fecha.getFullYear();
+  const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+  const dia = String(fecha.getDate()).padStart(2, '0');
+  return `${anio}-${mes}-${dia}`;
+};
+
+const hoy = fechaLocal(new Date());
+
 const filterForm = ref({
-  fecha: props.filters?.fecha || new Date().toISOString().substr(0, 10),
-  fecha_inicio: props.filters?.fecha_inicio || new Date().toISOString().substr(0, 10),
-  fecha_fin: props.filters?.fecha_fin || new Date().toISOString().substr(0, 10)
+  fecha: props.filters?.fecha || hoy,
+  fecha_inicio: props.filters?.fecha_inicio || hoy,
+  fecha_fin: props.filters?.fecha_fin || hoy
 });
 
 const verHoy = () => {
-  const hoy = new Date().toISOString().substr(0, 10);
   filterForm.value.fecha = hoy;
   filterForm.value.fecha_inicio = hoy;
   filterForm.value.fecha_fin = hoy;
+  consultarProduccion();
+};
+
+const verSemanaActual = () => {
+  const fechaActual = new Date();
+  const diasDesdeLunes = (fechaActual.getDay() + 6) % 7;
+  const lunes = new Date(fechaActual);
+  lunes.setDate(fechaActual.getDate() - diasDesdeLunes);
+  const sabado = new Date(lunes);
+  sabado.setDate(lunes.getDate() + 5);
+
+  filterForm.value.fecha = fechaLocal(lunes);
+  filterForm.value.fecha_inicio = fechaLocal(lunes);
+  filterForm.value.fecha_fin = fechaLocal(sabado);
   consultarProduccion();
 };
 

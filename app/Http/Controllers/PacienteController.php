@@ -31,6 +31,8 @@ class PacienteController extends Controller
 
     public function store(Request $request)
     {
+        abort_unless(auth()->user()?->role === 'admin', 403, 'No tienes permisos para registrar pacientes.');
+
         $validated = $request->validate([
             'nombre' => 'required|string|max:255',
             'cedula' => 'required|string|max:50|unique:pacientes,cedula',
@@ -42,5 +44,22 @@ class PacienteController extends Controller
         Paciente::create($validated);
 
         return redirect()->back()->with('success', 'Paciente registrado correctamente.');
+    }
+
+    public function update(Request $request, Paciente $paciente)
+    {
+        abort_unless(auth()->user()?->role === 'admin', 403, 'No tienes permisos para editar pacientes.');
+
+        $validated = $request->validate([
+            'nombre' => 'required|string|max:255',
+            'cedula' => 'required|string|max:50|unique:pacientes,cedula,' . $paciente->id,
+            'telefono' => 'required|string|max:50',
+            'email' => 'nullable|email|max:255',
+            'notas' => 'nullable|string'
+        ]);
+
+        $paciente->update($validated);
+
+        return redirect()->back()->with('success', 'Paciente actualizado correctamente.');
     }
 }

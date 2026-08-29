@@ -200,9 +200,10 @@
               <div class="row g-3">
                 <div class="col-md-6">
                   <label class="form-label fw-medium">Paciente / Cliente</label>
+                  <input v-model="busquedaPaciente" type="text" class="form-control form-control-sm mb-2" placeholder="Buscar cliente...">
                   <select class="form-select" v-model="formTurno.paciente_id" required>
                     <option value="">Seleccionar paciente...</option>
-                    <option v-for="p in pacientes_lista" :key="p.id" :value="p.id">{{ p.nombre }} ({{ p.cedula }})</option>
+                    <option v-for="p in pacientesFiltrados" :key="p.id" :value="p.id">{{ p.nombre }} ({{ p.cedula }})</option>
                   </select>
                 </div>
 
@@ -250,12 +251,13 @@
                     <span>Servicios a Realizar (Acumulables)</span>
                     <span class="text-muted small">Seleccione uno o varios</span>
                   </label>
-                  <div v-if="serviciosState.length" class="card p-3 bg-light border">
-                    <div v-for="s in serviciosState" :key="s.id" class="form-check mb-3">
+                  <input v-model="busquedaServicio" type="text" class="form-control form-control-sm mb-3" placeholder="Buscar servicio...">
+                  <div v-if="serviciosFiltrados.length" class="card p-3 bg-light border">
+                    <div v-for="s in serviciosFiltrados" :key="s.id" class="form-check mb-3">
                       <input class="form-check-input" type="checkbox" :id="'srv-agenda-'+s.id" v-model="s.selected">
                       <label class="form-check-label d-flex justify-content-between w-100" :for="'srv-agenda-'+s.id">
                         <span>{{ s.nombre }} ({{ s.duracion }} min)</span>
-                        <strong class="text-ayla-dark">${{ s.precio.toFixed(2) }}<br><span class="small text-ayla-rose">Bs. {{ Number(s.precio_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span></strong>
+                        <strong class="text-ayla-dark">${{ Number(s.precio ?? 0).toFixed(2) }}<br><span class="small text-ayla-rose">Bs. {{ Number(s.precio_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span></strong>
                       </label>
 
                       <div v-if="s.selected" class="mt-2 ms-4">
@@ -613,6 +615,7 @@
                 </div>
                 <div class="col-12">
                   <label class="form-label fw-medium">Servicios</label>
+                  <input v-model="busquedaServicioEdicion" type="text" class="form-control form-control-sm mb-2" placeholder="Buscar servicio...">
                   <div class="border rounded p-3 bg-light">
                     <div v-for="servicio in serviciosEdicion" :key="servicio.id" class="form-check mb-3">
                       <input class="form-check-input" type="checkbox" :id="'srv-edit-'+servicio.id" :value="servicio.id" v-model="citaEditForm.servicios">
@@ -777,8 +780,21 @@ const authUser = computed(() => page.props.auth?.user || null);
 const isSpecialist = computed(() => authUser.value?.role === 'especialista');
 const isAdmin = computed(() => authUser.value?.role === 'admin');
 const disponibilidadMensaje = computed(() => page.props.errors?.disponibilidad || '');
+const busquedaPaciente = ref('');
 const busquedaEspecialista = ref('');
 const busquedaAsistente = ref('');
+const busquedaServicio = ref('');
+const busquedaServicioEdicion = ref('');
+
+const pacientesFiltrados = computed(() => {
+  const texto = busquedaPaciente.value.trim().toLowerCase();
+  return (props.pacientes_lista || []).filter((paciente) => {
+    if (!texto) return true;
+    const nombre = (paciente.nombre || '').toLowerCase();
+    const cedula = (paciente.cedula || '').toLowerCase();
+    return nombre.includes(texto) || cedula.includes(texto);
+  });
+});
 
 const especialistasFiltrados = computed(() => {
   const texto = busquedaEspecialista.value.trim().toLowerCase();
@@ -845,21 +861,27 @@ const citaEditForm = useForm({
 });
 
 const serviciosEdicion = computed(() => {
-  return props.servicios_lista || [];
+  const texto = busquedaServicioEdicion.value.trim().toLowerCase();
+  return (props.servicios_lista || []).filter((servicio) => {
+    if (!texto) return true;
+    return (servicio.nombre || '').toLowerCase().includes(texto)
+      || (servicio.descripcion || '').toLowerCase().includes(texto);
+  });
 });
 
 const getEspecialistasEdicion = (servicio) => {
-  const idsPermitidos = [citaEditForm.especialista_id, citaEditForm.asistente_id]
-    .map((id) => Number(id || 0))
-    .filter(Boolean);
   const especialistas = props.especialistas_lista || [];
-  const relacionados = servicio.especialistas || [];
-  const opciones = idsPermitidos.map((id) => {
-    return especialistas.find((especialista) => Number(especialista.id) === id)
-      || relacionados.find((especialista) => Number(especialista.id) === id);
-  }).filter(Boolean);
+  const relacionados = Array.isArray(servicio.especialistas) ? servicio.especialistas : [];
 
-  return opciones.filter((especialista, index) => opciones.findIndex((item) => Number(item.id) === Number(especialista.id)) === index);
+  const opciones = [
+    ...especialistas,
+    ...relacionados,
+  ].filter((especialista, index, lista) => {
+    const id = Number(especialista.id);
+    return id > 0 && lista.findIndex((item) => Number(item.id) === id) === index;
+  });
+
+  return opciones;
 };
 
 const verDetalle = (cita) => {
@@ -984,21 +1006,15 @@ const formTurno = useForm({
 });
 
 const getEspecialistasServicioDisponibles = (servicio) => {
-  const principalId = Number(formTurno.especialista_id || 0);
-  const asistenteId = Number(formTurno.asistente_id || 0);
-  const opciones = [];
+  const especialistas = props.especialistas_lista || [];
+  const relacionados = Array.isArray(servicio.especialistas) ? servicio.especialistas : [];
 
-  if (principalId) {
-    const principal = (props.especialistas_lista || []).find((e) => Number(e.id) === principalId);
-    if (principal) opciones.push(principal);
-  }
+  const opciones = [...especialistas, ...relacionados].filter((especialista, index, lista) => {
+    const id = Number(especialista.id);
+    return id > 0 && lista.findIndex((item) => Number(item.id) === id) === index;
+  });
 
-  if (asistenteId && asistenteId !== principalId) {
-    const asistente = (props.especialistas_lista || []).find((e) => Number(e.id) === asistenteId);
-    if (asistente) opciones.push(asistente);
-  }
-
-  return opciones.length ? opciones : (props.especialistas_lista || []);
+  return opciones;
 };
 
 const getEspecialistaActual = (servicio) => {
@@ -1032,18 +1048,15 @@ const getServicioPrecioBase = (servicio) => {
 };
 
 const serviciosDisponibles = computed(() => {
-  const especialistaId = Number(formTurno.especialista_id || 0);
+  return props.servicios_lista || [];
+});
 
-  if (!especialistaId) {
-    return props.servicios_lista;
-  }
-
-  return props.servicios_lista.filter((servicio) => {
-    if (!Array.isArray(servicio.especialistas) || servicio.especialistas.length === 0) {
-      return false;
-    }
-
-    return servicio.especialistas.some((especialista) => Number(especialista.id) === especialistaId);
+const serviciosFiltrados = computed(() => {
+  const texto = busquedaServicio.value.trim().toLowerCase();
+  return (serviciosState.value || []).filter((servicio) => {
+    if (!texto) return true;
+    return (servicio.nombre || '').toLowerCase().includes(texto)
+      || (servicio.descripcion || '').toLowerCase().includes(texto);
   });
 });
 
@@ -1056,7 +1069,7 @@ const serviciosState = ref([]);
 watch(
   () => formTurno.especialista_id,
   () => {
-    serviciosState.value = serviciosDisponibles.value.map((servicio) => ({
+    serviciosState.value = (serviciosDisponibles.value || []).map((servicio) => ({
       ...servicio,
       selected: false,
     }));

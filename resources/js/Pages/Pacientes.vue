@@ -8,7 +8,7 @@
           <h2 class="brand-font fw-bold text-ayla-dark mb-0">Gestión de Pacientes / Clientes</h2>
           <p class="text-muted small mb-0">Directorio centralizado y expedientes de historial clínico de atenciones</p>
         </div>
-        <button class="btn btn-ayla-primary px-4" data-bs-toggle="modal" data-bs-target="#modalNuevoPaciente">
+        <button class="btn btn-ayla-primary px-4" @click="abrirModalCrear" data-bs-toggle="modal" data-bs-target="#modalNuevoPaciente">
           <i class="bi bi-person-plus me-1"></i> Registrar Nuevo Paciente
         </button>
       </div>
@@ -52,14 +52,24 @@
                   <span class="badge bg-ayla-rose">{{ p.citas_count }} Atenciones</span>
                 </td>
                 <td class="text-end">
-                  <button 
-                    class="btn btn-sm btn-ayla-outline" 
-                    @click="verExpediente(p)" 
-                    data-bs-toggle="modal" 
-                    data-bs-target="#modalExpediente"
-                  >
-                    <i class="bi bi-file-earmark-medical me-1"></i> Expediente Histórico
-                  </button>
+                  <div class="d-flex justify-content-end gap-2 flex-wrap">
+                    <button 
+                      class="btn btn-sm btn-ayla-outline" 
+                      @click="abrirModalEditar(p)"
+                      data-bs-toggle="modal" 
+                      data-bs-target="#modalNuevoPaciente"
+                    >
+                      <i class="bi bi-pencil me-1"></i> Editar
+                    </button>
+                    <button 
+                      class="btn btn-sm btn-ayla-outline" 
+                      @click="verExpediente(p)" 
+                      data-bs-toggle="modal" 
+                      data-bs-target="#modalExpediente"
+                    >
+                      <i class="bi bi-file-earmark-medical me-1"></i> Expediente Histórico
+                    </button>
+                  </div>
                 </td>
               </tr>
               <tr v-if="pacientes.length === 0">
@@ -79,7 +89,7 @@
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content card-ayla border-0">
           <div class="modal-header bg-ayla-cream">
-            <h5 class="modal-title brand-font fw-bold"><i class="bi bi-person-plus me-2"></i>Registrar Nuevo Paciente</h5>
+            <h5 class="modal-title brand-font fw-bold"><i class="bi bi-person-plus me-2"></i>{{ modoEdicion ? 'Editar Paciente' : 'Registrar Nuevo Paciente' }}</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <form @submit.prevent="guardarPaciente">
@@ -111,7 +121,9 @@
             </div>
             <div class="modal-footer border-top">
               <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-              <button type="submit" class="btn btn-ayla-primary px-4" :disabled="formPaciente.processing">Guardar Paciente</button>
+              <button type="submit" class="btn btn-ayla-primary px-4" :disabled="formPaciente.processing">
+                {{ modoEdicion ? 'Actualizar Paciente' : 'Guardar Paciente' }}
+              </button>
             </div>
           </form>
         </div>
@@ -212,6 +224,9 @@ const obtenerIniciales = (nombre) => {
 };
 
 // Formulario de Nuevo Paciente
+const modoEdicion = ref(false);
+const pacienteIdActual = ref(null);
+
 const formPaciente = useForm({
   nombre: '',
   cedula: '',
@@ -220,14 +235,46 @@ const formPaciente = useForm({
   notas: ''
 });
 
+const abrirModalCrear = () => {
+  modoEdicion.value = false;
+  pacienteIdActual.value = null;
+  formPaciente.clearErrors();
+  formPaciente.reset();
+};
+
+const abrirModalEditar = (paciente) => {
+  if (!paciente) return;
+
+  modoEdicion.value = true;
+  pacienteIdActual.value = paciente.id;
+  formPaciente.clearErrors();
+  formPaciente.nombre = paciente.nombre || '';
+  formPaciente.cedula = paciente.cedula || '';
+  formPaciente.telefono = paciente.telefono || '';
+  formPaciente.email = paciente.email || '';
+  formPaciente.notas = paciente.notas || '';
+};
+
+const cerrarModalPaciente = () => {
+  const modalEl = document.getElementById('modalNuevoPaciente');
+  const modal = bootstrap.Modal.getInstance(modalEl);
+  if (modal) modal.hide();
+  formPaciente.reset();
+  formPaciente.clearErrors();
+  modoEdicion.value = false;
+  pacienteIdActual.value = null;
+};
+
 const guardarPaciente = () => {
+  if (modoEdicion.value && pacienteIdActual.value) {
+    formPaciente.put(`/pacientes/${pacienteIdActual.value}`, {
+      onSuccess: () => cerrarModalPaciente()
+    });
+    return;
+  }
+
   formPaciente.post('/pacientes', {
-    onSuccess: () => {
-      const modalEl = document.getElementById('modalNuevoPaciente');
-      const modal = bootstrap.Modal.getInstance(modalEl);
-      if (modal) modal.hide();
-      formPaciente.reset();
-    }
+    onSuccess: () => cerrarModalPaciente()
   });
 };
 </script>
