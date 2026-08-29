@@ -59,6 +59,10 @@ Route::middleware(['auth'])->group(function () {
         ->name('reportes.ayla-adicionales.store');
     Route::post('/reportes/pagos-semanales', [ReporteController::class, 'storePagoSemanal'])
         ->name('reportes.pagos-semanales.store');
+    Route::delete('/reportes/pagos-semanales/{pagoSemanal}', [ReporteController::class, 'destroyPagoSemanal'])
+        ->name('reportes.pagos-semanales.destroy');
+    Route::delete('/reportes/ayla-adicionales/{aylaAdicional}', [ReporteController::class, 'destroyAylaAdicional'])
+        ->name('reportes.ayla-adicionales.destroy');
 
     // Perfil (Breeze)
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

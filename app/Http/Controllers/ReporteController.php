@@ -159,4 +159,31 @@ class ReporteController extends Controller
 
         return redirect()->back()->with('success', 'Pago semanal marcado como realizado.');
     }
+
+    public function destroyPagoSemanal(PagoSemanalEspecialista $pagoSemanal)
+    {
+        abort_unless(Auth::user()?->role === 'admin', 403, 'No tienes permisos para modificar pagos semanales.');
+
+        $inicioSemanaActual = now()->startOfWeek(\Carbon\Carbon::MONDAY)->toDateString();
+        $finSemanaActual = now()->startOfWeek(\Carbon\Carbon::MONDAY)->addDays(5)->toDateString();
+        abort_unless(
+            $pagoSemanal->semana_inicio->toDateString() === $inicioSemanaActual
+                && $pagoSemanal->semana_fin->toDateString() === $finSemanaActual,
+            422,
+            'Solo se puede desmarcar el pago de la semana actual.'
+        );
+
+        $pagoSemanal->delete();
+
+        return redirect()->back()->with('success', 'Pago semanal desmarcado correctamente.');
+    }
+
+    public function destroyAylaAdicional(AylaAdicional $aylaAdicional)
+    {
+        abort_unless(Auth::user()?->role === 'admin', 403, 'No tienes permisos para eliminar ingresos adicionales.');
+
+        $aylaAdicional->delete();
+
+        return redirect()->back()->with('success', 'Ingreso adicional eliminado correctamente.');
+    }
 }

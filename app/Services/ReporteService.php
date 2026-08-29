@@ -112,11 +112,13 @@ class ReporteService
                 $precio = (float) ($servicio->pivot->precio_momento ?? 0);
                 $precioBs = (float) ($servicio->pivot->monto_bs_momento ?? 0);
                 $comisionPct = (float) ($servicio->pivot->comision_momento ?? ($esp->comision ?? 0));
+                $comisionMonto = (float) ($servicio->pivot->comision_monto ?? ($precio * ($comisionPct / 100)));
+                $comisionMontoBs = $precio > 0 ? round($precioBs * ($comisionMonto / $precio), 2) : 0;
 
                 $auditoriaMap[$espId]['ingreso_generado'] += $precio;
                 $auditoriaMap[$espId]['ingreso_generado_bs'] += $precioBs;
-                $auditoriaMap[$espId]['comision_especialista'] += round($precio * ($comisionPct / 100), 2);
-                $auditoriaMap[$espId]['comision_especialista_bs'] += round($precioBs * ($comisionPct / 100), 2);
+                $auditoriaMap[$espId]['comision_especialista'] += $comisionMonto;
+                $auditoriaMap[$espId]['comision_especialista_bs'] += $comisionMontoBs;
             }
 
             if ($cita->asistente_id) {
@@ -146,6 +148,11 @@ class ReporteService
                 $pct = (float) ($cita->comision_asistente_porcentaje ?? 0);
                 $auditoriaMap[$asistenteId]['comision_asistentes'] += round($subtotalCita * ($pct / 100), 2);
                 $auditoriaMap[$asistenteId]['comision_asistentes_bs'] += round($subtotalCitaBs * ($pct / 100), 2);
+
+                if (!in_array($cita->id, $auditoriaMap[$asistenteId]['citas_ids'])) {
+                    $auditoriaMap[$asistenteId]['citas_ids'][] = $cita->id;
+                    $auditoriaMap[$asistenteId]['citas_completadas']++;
+                }
             }
         }
 
@@ -191,6 +198,7 @@ class ReporteService
 
                 $pago = $pagosPorEspecialista->get($item['user_id']);
                 $item['semana_pagada'] = (bool) $pago;
+                $item['pago_semanal_id'] = $pago?->id;
                 $item['semana_pagada_at'] = $pago?->pagado_at?->format('d/m/Y H:i');
                 return $item;
             }, $auditoria);
@@ -296,6 +304,7 @@ class ReporteService
             'auditoria_especialistas' => $auditoria,
             'agendas' => $agendas,
             'ayla_adicionales' => $adicionales->map(fn ($adicional) => [
+                'id' => $adicional->id,
                 'fecha' => $adicional->fecha?->format('d/m/Y'),
                 'descripcion' => $adicional->descripcion,
                 'monto' => (float) $adicional->monto,

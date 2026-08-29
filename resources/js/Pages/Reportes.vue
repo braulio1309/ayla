@@ -124,9 +124,9 @@
                 <td>{{ item.aporte_porcentaje }}</td>
                 <td v-if="filters?.es_semana_actual" class="text-end">
                   <span v-if="!item.user_id" class="text-muted small">No aplica</span>
-                  <span v-else-if="item.semana_pagada" class="text-success fs-5" title="Semana pagada">
+                  <button v-else-if="item.semana_pagada" type="button" class="btn btn-sm text-success p-0" title="Desmarcar semana pagada" @click="desmarcarSemanaPagada(item)">
                     <i class="bi bi-check-circle-fill"></i>
-                  </span>
+                  </button>
                   <button v-else type="button" class="btn btn-sm btn-outline-success" @click="marcarSemanaPagada(item)">
                     <i class="bi bi-cash-coin me-1"></i>Marcar pagada
                   </button>
@@ -152,6 +152,7 @@
                 <th>Fecha</th>
                 <th>Descripción</th>
                 <th class="text-end">Monto</th>
+                <th class="text-end">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -161,6 +162,11 @@
                 <td class="text-end fw-bold text-success">
                   ${{ Number(adicional.monto || 0).toFixed(2) }}
                   <br><span class="small text-ayla-rose fw-normal">Bs. {{ formatoBs(adicional.monto_bs) }}</span>
+                </td>
+                <td class="text-end">
+                  <button type="button" class="btn btn-sm btn-outline-danger" title="Eliminar ingreso adicional" @click="eliminarAylaAdicional(adicional)">
+                    <i class="bi bi-trash"></i>
+                  </button>
                 </td>
               </tr>
             </tbody>
@@ -341,6 +347,22 @@ const marcarSemanaPagada = (item) => {
   router.post('/reportes/pagos-semanales', {
     especialista_id: item.user_id,
   }, {
+    preserveScroll: true,
+  });
+};
+
+const desmarcarSemanaPagada = (item) => {
+  if (!item?.pago_semanal_id || !confirm(`¿Desmarcar como pagada la semana actual de ${item.especialista}?`)) return;
+
+  router.delete(`/reportes/pagos-semanales/${item.pago_semanal_id}`, {
+    preserveScroll: true,
+  });
+};
+
+const eliminarAylaAdicional = (adicional) => {
+  if (!adicional?.id || !confirm(`¿Eliminar el ingreso adicional "${adicional.descripcion}"?`)) return;
+
+  router.delete(`/reportes/ayla-adicionales/${adicional.id}`, {
     preserveScroll: true,
   });
 };
