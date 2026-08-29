@@ -70,8 +70,16 @@ class ReporteService
 
         $totalAdicionales = (float) $adicionales->sum('monto');
         $totalAdicionalesBs = (float) $adicionales->sum('monto_bs');
-        $totalGeneral = (float) $citas->sum('monto_total') + $totalAdicionales;
-        $totalGeneralBs = (float) $citas->sum('monto_total_bs') + $totalAdicionalesBs;
+        $totalServicios = (float) $citas->sum(function ($cita) {
+            $subtotal = (float) $cita->servicios->sum('pivot.precio_momento');
+            return $subtotal > 0 ? $subtotal : (float) $cita->monto_total;
+        });
+        $totalServiciosBs = (float) $citas->sum(function ($cita) {
+            $subtotal = (float) $cita->servicios->sum('pivot.monto_bs_momento');
+            return $subtotal > 0 ? $subtotal : (float) $cita->monto_total_bs;
+        });
+        $totalGeneral = $totalServicios + $totalAdicionales;
+        $totalGeneralBs = $totalServiciosBs + $totalAdicionalesBs;
         $totalesEspecialista = null;
 
         if ($especialistaId && !$soloAylaAdicionales) {
@@ -208,8 +216,8 @@ class ReporteService
         $totalComisionEspecialistasBs = round(array_sum(array_column($auditoria, 'comision_especialista_bs')), 2);
         $totalComisionAsistentes = round(array_sum(array_column($auditoria, 'comision_asistentes')), 2);
         $totalComisionAsistentesBs = round(array_sum(array_column($auditoria, 'comision_asistentes_bs')), 2);
-        $totalNegocio = round(array_sum(array_column($auditoria, 'ganancia_negocio')), 2);
-        $totalNegocioBs = round(array_sum(array_column($auditoria, 'ganancia_negocio_bs')), 2);
+        $totalNegocio = round($totalGeneral - $totalComisionEspecialistas - $totalComisionAsistentes, 2);
+        $totalNegocioBs = round($totalGeneralBs - $totalComisionEspecialistasBs - $totalComisionAsistentesBs, 2);
 
         if ($totalesEspecialista) {
             $totalComisionEspecialistas = $totalesEspecialista['comision_especialista'];
