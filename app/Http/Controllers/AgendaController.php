@@ -66,6 +66,12 @@ class AgendaController extends Controller
             'servicio_comision_tipos.*' => 'nullable|in:porcentaje,monto',
             'servicio_comision_montos' => 'nullable|array',
             'servicio_comision_montos.*' => 'nullable|numeric|min:0',
+            'servicio_requiere_lavado' => 'nullable|array',
+            'servicio_requiere_lavado.*' => 'nullable|boolean',
+            'servicio_lavado_especialistas' => 'nullable|array',
+            'servicio_lavado_especialistas.*' => 'nullable|exists:users,id',
+            'servicio_lavado_montos' => 'nullable|array',
+            'servicio_lavado_montos.*' => 'nullable|numeric|min:0',
             'fecha' => 'required|date',
             'hora_inicio' => 'required',
             'holgura_min' => 'required|numeric',
@@ -163,13 +169,27 @@ class AgendaController extends Controller
                 $precioMomento = $precioManual !== null && $precioManual !== ''
                     ? (float) $precioManual
                     : $servicio->getPrecioParaEspecialista($especialistaServicioId);
+                $requiereLavado = filter_var($request->input('servicio_requiere_lavado.' . $servicio->id, false), FILTER_VALIDATE_BOOLEAN);
+                $lavadoMonto = $requiereLavado ? (float) ($request->input('servicio_lavado_montos.' . $servicio->id, 0) ?? 0) : 0;
+                abort_if($lavadoMonto > $precioMomento, 422, 'El lavado no puede superar el precio del servicio.');
                 $comisionTipo = $request->input('servicio_comision_tipos.' . $servicio->id, 'porcentaje');
+                $comisionPctSolicitada = (float) ($request->input('servicio_comisiones.' . $servicio->id, 0) ?? 0);
+                $comisionMontoSolicitado = (float) ($request->input('servicio_comision_montos.' . $servicio->id, 0) ?? 0);
                 $comisionValor = $comisionTipo === 'monto'
-                    ? (float) ($request->input('servicio_comision_montos.' . $servicio->id, 0) ?? 0)
-                    : round($precioMomento * ((float) ($request->input('servicio_comisiones.' . $servicio->id, 0) ?? 0) / 100), 2);
+                    ? $comisionMontoSolicitado
+                    : round($precioMomento * ($comisionPctSolicitada / 100), 2);
                 $comisionPorcentaje = $comisionTipo === 'monto' && $precioMomento > 0
                     ? round(($comisionValor / $precioMomento) * 100, 2)
-                    : (float) ($request->input('servicio_comisiones.' . $servicio->id, 0) ?? 0);
+                    : $comisionPctSolicitada;
+                if ($requiereLavado) {
+                    $baseComision = max(0, round($precioMomento - $lavadoMonto, 2));
+                    $comisionValor = $comisionTipo === 'monto'
+                        ? min($comisionMontoSolicitado, $baseComision)
+                        : round($baseComision * ($comisionPctSolicitada / 100), 2);
+                    $comisionPorcentaje = $comisionTipo === 'monto' && $baseComision > 0
+                        ? round(($comisionValor / $baseComision) * 100, 2)
+                        : $comisionPctSolicitada;
+                }
 
                 $cita->servicios()->attach($servicio->id, [
                     'precio_momento' => $precioMomento,
@@ -179,6 +199,9 @@ class AgendaController extends Controller
                     'comision_momento' => $comisionPorcentaje,
                     'comision_tipo' => $comisionTipo,
                     'comision_monto' => $comisionValor,
+                    'requiere_lavado' => $requiereLavado,
+                    'lavado_especialista_id' => $requiereLavado ? $request->input('servicio_lavado_especialistas.' . $servicio->id) : null,
+                    'lavado_monto' => $lavadoMonto,
                 ]);
             }
 
@@ -251,6 +274,12 @@ class AgendaController extends Controller
                 'servicio_comision_tipos.*' => 'nullable|in:porcentaje,monto',
                 'servicio_comision_montos' => 'nullable|array',
                 'servicio_comision_montos.*' => 'nullable|numeric|min:0',
+                'servicio_requiere_lavado' => 'nullable|array',
+                'servicio_requiere_lavado.*' => 'nullable|boolean',
+                'servicio_lavado_especialistas' => 'nullable|array',
+                'servicio_lavado_especialistas.*' => 'nullable|exists:users,id',
+                'servicio_lavado_montos' => 'nullable|array',
+                'servicio_lavado_montos.*' => 'nullable|numeric|min:0',
                 'fecha' => 'required|date',
                 'hora_inicio' => 'required|date_format:H:i',
                 'holgura_min' => 'required|integer|min:0',
@@ -312,13 +341,27 @@ class AgendaController extends Controller
                 $precioMomento = $precioManual !== null && $precioManual !== ''
                     ? (float) $precioManual
                     : (float) $servicio->getPrecioParaEspecialista($especialistaServicioId);
+                $requiereLavado = filter_var($request->input('servicio_requiere_lavado.' . $servicio->id, false), FILTER_VALIDATE_BOOLEAN);
+                $lavadoMonto = $requiereLavado ? (float) ($request->input('servicio_lavado_montos.' . $servicio->id, 0) ?? 0) : 0;
+                abort_if($lavadoMonto > $precioMomento, 422, 'El lavado no puede superar el precio del servicio.');
                 $comisionTipo = $request->input('servicio_comision_tipos.' . $servicio->id, 'porcentaje');
+                $comisionPctSolicitada = (float) ($request->input('servicio_comisiones.' . $servicio->id, 0) ?? 0);
+                $comisionMontoSolicitado = (float) ($request->input('servicio_comision_montos.' . $servicio->id, 0) ?? 0);
                 $comisionValor = $comisionTipo === 'monto'
-                    ? (float) ($request->input('servicio_comision_montos.' . $servicio->id, 0) ?? 0)
-                    : round($precioMomento * ((float) ($request->input('servicio_comisiones.' . $servicio->id, 0) ?? 0) / 100), 2);
+                    ? $comisionMontoSolicitado
+                    : round($precioMomento * ($comisionPctSolicitada / 100), 2);
                 $comisionPorcentaje = $comisionTipo === 'monto' && $precioMomento > 0
                     ? round(($comisionValor / $precioMomento) * 100, 2)
-                    : (float) ($request->input('servicio_comisiones.' . $servicio->id, 0) ?? 0);
+                    : $comisionPctSolicitada;
+                if ($requiereLavado) {
+                    $baseComision = max(0, round($precioMomento - $lavadoMonto, 2));
+                    $comisionValor = $comisionTipo === 'monto'
+                        ? min($comisionMontoSolicitado, $baseComision)
+                        : round($baseComision * ($comisionPctSolicitada / 100), 2);
+                    $comisionPorcentaje = $comisionTipo === 'monto' && $baseComision > 0
+                        ? round(($comisionValor / $baseComision) * 100, 2)
+                        : $comisionPctSolicitada;
+                }
 
                 return [
                     $servicio->id => [
@@ -329,6 +372,9 @@ class AgendaController extends Controller
                         'comision_momento' => $comisionPorcentaje,
                         'comision_tipo' => $comisionTipo,
                         'comision_monto' => $comisionValor,
+                        'requiere_lavado' => $requiereLavado,
+                        'lavado_especialista_id' => $requiereLavado ? $request->input('servicio_lavado_especialistas.' . $servicio->id) : null,
+                        'lavado_monto' => $lavadoMonto,
                     ],
                 ];
             })->all());

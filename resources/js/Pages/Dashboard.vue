@@ -345,6 +345,24 @@
                             >
                           </div>
                         </div>
+                        <div class="form-check mt-2">
+                          <input class="form-check-input" type="checkbox" :id="'lavado-dash-'+s.id" v-model="formTurno.servicio_requiere_lavado[s.id]">
+                          <label class="form-check-label small" :for="'lavado-dash-'+s.id">Requiere lavado</label>
+                        </div>
+                        <div v-if="formTurno.servicio_requiere_lavado[s.id]" class="row g-2 mt-1">
+                          <div class="col-md-6">
+                            <label class="form-label small text-muted mb-1">Profesional del lavado</label>
+                            <select class="form-select form-select-sm" v-model="formTurno.servicio_lavado_especialistas[s.id]" required>
+                              <option value="">Seleccionar profesional...</option>
+                              <option v-for="especialista in especialistas_lista" :key="especialista.id" :value="especialista.id">{{ especialista.name }}</option>
+                            </select>
+                          </div>
+                          <div class="col-md-6">
+                            <label class="form-label small text-muted mb-1">Monto del lavado (USD)</label>
+                            <input type="number" min="0" :max="getServicioPrecioBase(s)" step="0.01" class="form-control form-control-sm" v-model.number="formTurno.servicio_lavado_montos[s.id]" required>
+                          </div>
+                          <div class="col-12 small text-muted">El especialista del servicio recibirá el precio menos el lavado.</div>
+                        </div>
                         <div class="mt-2 text-end small text-muted">
                           Precio del servicio: ${{ Number(formTurno.precios_servicios[s.id] ?? getServicioPrecioBase(s)).toFixed(2) }}
                         </div>
@@ -572,7 +590,12 @@
                   <tbody class="small">
                     <tr v-for="sDet in citaSeleccionada.servicios_detalle" :key="'sd-'+sDet.id">
                       <td>{{ sDet.nombre }}</td>
-                      <td>{{ sDet.especialista_nombre }}</td>
+                      <td>
+                        {{ sDet.especialista_nombre }}
+                        <div v-if="sDet.requiere_lavado" class="small text-info mt-1">
+                          Lavado: {{ sDet.lavado_especialista_nombre || 'Sin profesional' }} · ${{ Number(sDet.lavado_monto || 0).toFixed(2) }}
+                        </div>
+                      </td>
                       <td class="text-center">{{ Number(sDet.comision_porcentaje || 0).toFixed(2) }}%</td>
                       <td class="text-end fw-medium">
                         ${{ Number(sDet.precio || 0).toFixed(2) }}
@@ -838,6 +861,9 @@ const citaEditForm = useForm({
   servicio_comisiones: {},
   servicio_comision_tipos: {},
   servicio_comision_montos: {},
+  servicio_requiere_lavado: {},
+  servicio_lavado_especialistas: {},
+  servicio_lavado_montos: {},
   precios_servicios: {},
   fecha: '',
   hora_inicio: '',
@@ -888,6 +914,9 @@ const abrirEdicionCita = (cita) => {
   ]));
   citaEditForm.servicio_comision_tipos = Object.fromEntries((cita.servicios_detalle || []).map((servicio) => [servicio.id, servicio.comision_tipo || 'porcentaje']));
   citaEditForm.servicio_comision_montos = Object.fromEntries((cita.servicios_detalle || []).map((servicio) => [servicio.id, Number(servicio.comision_monto || 0)]));
+  citaEditForm.servicio_requiere_lavado = Object.fromEntries((cita.servicios_detalle || []).map((servicio) => [servicio.id, Boolean(servicio.requiere_lavado)]));
+  citaEditForm.servicio_lavado_especialistas = Object.fromEntries((cita.servicios_detalle || []).map((servicio) => [servicio.id, servicio.lavado_especialista_id || '']));
+  citaEditForm.servicio_lavado_montos = Object.fromEntries((cita.servicios_detalle || []).map((servicio) => [servicio.id, Number(servicio.lavado_monto || 0)]));
   citaEditForm.precios_servicios = Object.fromEntries((cita.servicios_detalle || []).map((servicio) => [
     servicio.id,
     Number(servicio.precio || 0)
@@ -971,6 +1000,9 @@ const formTurno = useForm({
   servicio_comisiones: {},
   servicio_comision_tipos: {},
   servicio_comision_montos: {},
+  servicio_requiere_lavado: {},
+  servicio_lavado_especialistas: {},
+  servicio_lavado_montos: {},
   fecha: props.filters?.fecha || new Date().toISOString().substr(0, 10),
   hora_inicio: '08:00',
   holgura_min: 15,
@@ -1161,7 +1193,12 @@ const resumenGananciasEspecialistas = computed(() => {
     const precioUsd = getServicioPrecioBase(s) * (s.es_recurrente === true ? 1 : sesionesSeleccionadas.value);
     const tipoComision = formTurno.servicio_comision_tipos?.[s.id] ?? 'porcentaje';
     const comisionPct = Number(formTurno.servicio_comisiones?.[s.id] ?? getEspecialistaComision(s) ?? 0);
-    const gananciaUsd = tipoComision === 'monto'
+    const lavadoMonto = formTurno.servicio_requiere_lavado?.[s.id] ? Number(formTurno.servicio_lavado_montos?.[s.id] ?? 0) : 0;
+    const gananciaUsd = formTurno.servicio_requiere_lavado?.[s.id]
+      ? tipoComision === 'monto'
+        ? Math.min(Number(formTurno.servicio_comision_montos?.[s.id] ?? 0), Math.max(0, precioUsd - lavadoMonto)) * (s.es_recurrente === true ? 1 : sesionesSeleccionadas.value)
+        : Math.max(0, precioUsd - lavadoMonto) * (comisionPct / 100)
+      : tipoComision === 'monto'
       ? Number(formTurno.servicio_comision_montos?.[s.id] ?? 0) * (s.es_recurrente === true ? 1 : sesionesSeleccionadas.value)
       : precioUsd * (comisionPct / 100);
 
@@ -1206,6 +1243,15 @@ const guardarTurno = () => {
   );
   formTurno.servicio_comision_montos = Object.fromEntries(
     serviciosState.value.filter(s => s.selected).map(s => [s.id, Number(formTurno.servicio_comision_montos?.[s.id] ?? 0)])
+  );
+  formTurno.servicio_requiere_lavado = Object.fromEntries(
+    serviciosState.value.filter(s => s.selected).map(s => [s.id, Boolean(formTurno.servicio_requiere_lavado?.[s.id])])
+  );
+  formTurno.servicio_lavado_especialistas = Object.fromEntries(
+    serviciosState.value.filter(s => s.selected).map(s => [s.id, formTurno.servicio_requiere_lavado?.[s.id] ? Number(formTurno.servicio_lavado_especialistas?.[s.id] || 0) : null])
+  );
+  formTurno.servicio_lavado_montos = Object.fromEntries(
+    serviciosState.value.filter(s => s.selected).map(s => [s.id, formTurno.servicio_requiere_lavado?.[s.id] ? Number(formTurno.servicio_lavado_montos?.[s.id] || 0) : 0])
   );
 
   if (!formTurno.asistente_id) {

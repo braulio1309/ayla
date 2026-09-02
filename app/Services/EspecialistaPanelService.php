@@ -21,6 +21,9 @@ class EspecialistaPanelService
                     ->orWhere('asistente_id', $usuarioId)
                     ->orWhereHas('servicios', function ($q) use ($usuarioId) {
                         $q->where('cita_servicio.especialista_id', $usuarioId);
+                    })
+                    ->orWhereHas('servicios', function ($q) use ($usuarioId) {
+                        $q->where('cita_servicio.lavado_especialista_id', $usuarioId);
                     });
             })
             ->whereBetween('fecha', [$fechaInicio, $fechaFin])
@@ -44,6 +47,13 @@ class EspecialistaPanelService
                     $totalGeneradoBs += $precioBs;
                     $comisionTotal += round($precioUsd * ($comisionPct / 100), 2);
                     $comisionTotalBs += round($precioBs * ($comisionPct / 100), 2);
+
+                    if ((int) ($srv->pivot->lavado_especialista_id ?? 0) === (int) $usuarioId) {
+                        $lavadoMonto = (float) ($srv->pivot->lavado_monto ?? 0);
+                        $lavadoMontoBs = $precioUsd > 0 ? round($precioBs * ($lavadoMonto / $precioUsd), 2) : 0;
+                        $comisionTotal += $lavadoMonto;
+                        $comisionTotalBs += $lavadoMontoBs;
+                    }
                 }
             }
         }

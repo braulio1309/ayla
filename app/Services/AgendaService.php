@@ -55,7 +55,7 @@ class AgendaService
                 ? round($subtotalServiciosBs * (((float) ($cita->comision_asistente_porcentaje ?? 0)) / 100), 2)
                 : 0;
 
-            $especialistasCita = User::whereIn('id', $cita->servicios->pluck('pivot.especialista_id')->filter()->unique())->get()->keyBy('id');
+            $especialistasCita = User::whereIn('id', $cita->servicios->pluck('pivot.especialista_id')->merge($cita->servicios->pluck('pivot.lavado_especialista_id'))->filter()->unique())->get()->keyBy('id');
 
             $serviciosDetalle = $cita->servicios->map(function ($servicio) use ($cita, $especialistasCita) {
                 $espId = (int) ($servicio->pivot->especialista_id ?: $cita->user_id);
@@ -76,8 +76,12 @@ class AgendaService
                     'comision_porcentaje' => $comisionPct,
                     'comision_tipo' => $comisionTipo,
                     'comision_monto' => $comisionMonto,
-                    'ganancia' => round($precio * ($comisionPct / 100), 2),
-                    'ganancia_bs' => round($precioBs * ($comisionPct / 100), 2),
+                    'requiere_lavado' => (bool) $servicio->pivot->requiere_lavado,
+                    'lavado_especialista_id' => $servicio->pivot->lavado_especialista_id,
+                    'lavado_especialista_nombre' => $especialistasCita->get($servicio->pivot->lavado_especialista_id)?->name,
+                    'lavado_monto' => (float) ($servicio->pivot->lavado_monto ?? 0),
+                    'ganancia' => $comisionMonto,
+                    'ganancia_bs' => $precio > 0 ? round($precioBs * ($comisionMonto / $precio), 2) : 0,
                 ];
             })->values()->all();
 

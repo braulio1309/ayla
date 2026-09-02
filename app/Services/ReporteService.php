@@ -44,6 +44,9 @@ class ReporteService
                     ->orWhere('asistente_id', $especialistaId)
                     ->orWhereHas('servicios', function ($serviciosQuery) use ($especialistaId) {
                         $serviciosQuery->where('cita_servicio.especialista_id', $especialistaId);
+                    })
+                    ->orWhereHas('servicios', function ($serviciosQuery) use ($especialistaId) {
+                        $serviciosQuery->where('cita_servicio.lavado_especialista_id', $especialistaId);
                     });
             });
         }
@@ -127,6 +130,38 @@ class ReporteService
                 $auditoriaMap[$espId]['ingreso_generado_bs'] += $precioBs;
                 $auditoriaMap[$espId]['comision_especialista'] += $comisionMonto;
                 $auditoriaMap[$espId]['comision_especialista_bs'] += $comisionMontoBs;
+
+                $lavadoId = (int) ($servicio->pivot->lavado_especialista_id ?? 0);
+                $lavadoMonto = (float) ($servicio->pivot->lavado_monto ?? 0);
+                if ($lavadoId > 0 && $lavadoMonto > 0) {
+                    $lavado = User::find($lavadoId);
+                    if (!isset($auditoriaMap[$lavadoId])) {
+                        $auditoriaMap[$lavadoId] = [
+                            'especialista' => $lavado?->name ?? 'Profesional de lavado',
+                            'user_id' => $lavadoId,
+                            'categoria' => 'Especialista',
+                            'citas_completadas' => 0,
+                            'citas_ids' => [],
+                            'ingreso_generado' => 0,
+                            'ingreso_generado_bs' => 0,
+                            'comision_especialista' => 0,
+                            'comision_especialista_bs' => 0,
+                            'comision_asistentes' => 0,
+                            'comision_asistentes_bs' => 0,
+                        ];
+                    }
+
+                    if (!in_array($cita->id, $auditoriaMap[$lavadoId]['citas_ids'])) {
+                        $auditoriaMap[$lavadoId]['citas_ids'][] = $cita->id;
+                        $auditoriaMap[$lavadoId]['citas_completadas']++;
+                    }
+
+                    $lavadoMontoBs = $precio > 0 ? round($precioBs * ($lavadoMonto / $precio), 2) : 0;
+                    $auditoriaMap[$lavadoId]['ingreso_generado'] += $lavadoMonto;
+                    $auditoriaMap[$lavadoId]['ingreso_generado_bs'] += $lavadoMontoBs;
+                    $auditoriaMap[$lavadoId]['comision_especialista'] += $lavadoMonto;
+                    $auditoriaMap[$lavadoId]['comision_especialista_bs'] += $lavadoMontoBs;
+                }
             }
 
             if ($cita->asistente_id) {
@@ -250,6 +285,10 @@ class ReporteService
                     'comision_porcentaje' => $comision,
                     'comision_tipo' => $comisionTipo,
                     'comision_monto' => $comisionMonto,
+                    'requiere_lavado' => (bool) $servicio->pivot->requiere_lavado,
+                    'lavado_especialista_id' => $servicio->pivot->lavado_especialista_id,
+                    'lavado_especialista' => optional(User::find($servicio->pivot->lavado_especialista_id))->name,
+                    'lavado_monto' => (float) ($servicio->pivot->lavado_monto ?? 0),
                     'comision' => $comisionMonto,
                     'comision_bs' => $precio > 0 ? round($precioBs * ($comisionMonto / $precio), 2) : 0,
                 ];
@@ -261,6 +300,18 @@ class ReporteService
             $gananciaFiltradaBs = $especialistaId && !$soloAylaAdicionales
                 ? collect($serviciosDetalle)->where('especialista_id', (int) $especialistaId)->sum('comision_bs')
                 : array_sum(array_column($serviciosDetalle, 'comision_bs'));
+
+            if ($especialistaId && !$soloAylaAdicionales) {
+                $serviciosLavado = collect($serviciosDetalle)->filter(fn ($detalle) =>
+                    (int) ($detalle['lavado_especialista_id'] ?? 0) === (int) $especialistaId
+                );
+                $gananciaFiltrada += $serviciosLavado->sum('lavado_monto');
+                $gananciaFiltradaBs += $serviciosLavado->sum(fn ($detalle) =>
+                    (float) ($detalle['precio'] ?? 0) > 0
+                        ? round((float) ($detalle['precio_bs'] ?? 0) * ((float) ($detalle['lavado_monto'] ?? 0) / (float) $detalle['precio']), 2)
+                        : 0
+                );
+            }
 
             if ($especialistaId && !$soloAylaAdicionales && (int) $cita->asistente_id === (int) $especialistaId) {
                 $subtotal = (float) $cita->servicios->sum('pivot.precio_momento');
@@ -356,6 +407,26 @@ class ReporteService
                 $totales['ingresos_brutos_bs'] += $precioBs;
                 $totales['comision_especialista'] += $comision;
                 $totales['comision_especialista_bs'] += $comisionBs;
+            }
+
+            foreach ($cita->servicios as $servicio) {
+                $lavadoId = (int) ($servicio->pivot->lavado_especialista_id ?? 0);
+                if ($lavadoId !== $especialistaId) {
+                    continue;
+                }
+
+                $precio = (float) ($servicio->pivot->precio_momento ?? 0);
+                $precioBs = (float) ($servicio->pivot->monto_bs_momento ?? 0);
+                $lavadoMonto = (float) ($servicio->pivot->lavado_monto ?? 0);
+                $lavadoMontoBs = $precio > 0 ? round($precioBs * ($lavadoMonto / $precio), 2) : 0;
+                $esProfesionalPrincipal = (int) ($servicio->pivot->especialista_id ?: $cita->user_id) === $especialistaId;
+
+                if (!$esProfesionalPrincipal) {
+                    $totales['ingresos_brutos'] += $lavadoMonto;
+                    $totales['ingresos_brutos_bs'] += $lavadoMontoBs;
+                }
+                $totales['comision_especialista'] += $lavadoMonto;
+                $totales['comision_especialista_bs'] += $lavadoMontoBs;
             }
 
             if ((int) $cita->asistente_id === $especialistaId) {

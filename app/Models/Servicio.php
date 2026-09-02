@@ -31,7 +31,7 @@ class Servicio extends Model
     public function citas(): BelongsToMany
     {
         return $this->belongsToMany(Cita::class, 'cita_servicio')
-                    ->withPivot('precio_momento', 'monto_bs_momento', 'duracion_momento')
+                    ->withPivot('precio_momento', 'monto_bs_momento', 'duracion_momento', 'especialista_id', 'comision_momento', 'comision_tipo', 'comision_monto', 'requiere_lavado', 'lavado_especialista_id', 'lavado_monto')
                     ->withTimestamps();
     }
 

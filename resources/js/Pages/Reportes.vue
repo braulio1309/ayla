@@ -209,6 +209,8 @@
                     <div v-for="servicio in agenda.servicios_detalle" :key="`${agenda.id}-${servicio.id}`" class="border-bottom py-1">
                       <strong>{{ servicio.nombre }}</strong> · {{ servicio.especialista }}<br>
                       <span>${{ Number(servicio.precio || 0).toFixed(2) }} (Bs. {{ formatoBs(servicio.precio_bs) }}) · Comisión {{ Number(servicio.comision_porcentaje || 0).toFixed(2) }}%: ${{ Number(servicio.comision || 0).toFixed(2) }}</span>
+                      <br v-if="servicio.requiere_lavado">
+                      <span v-if="servicio.requiere_lavado" class="text-info">Lavado: {{ servicio.lavado_especialista || 'Profesional no indicado' }} · ${{ Number(servicio.lavado_monto || 0).toFixed(2) }}</span>
                     </div>
                     <div class="mt-2 text-success fw-bold border-top pt-2">
                       Total ganado: ${{ totalGanadoAgenda(agenda).toFixed(2) }}
