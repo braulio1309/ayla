@@ -26,8 +26,18 @@ class ReporteController extends Controller
         $periodo = $request->input('periodo', 'agosto_2026');
         $especialistaId = $request->input('especialista_id', '');
         $servicioId = $request->input('servicio_id', '');
+        $request->validate([
+            'fecha_inicio' => 'nullable|date',
+            'fecha_fin' => 'nullable|date|after_or_equal:fecha_inicio',
+        ]);
 
-        $data = $this->reporteService->getReporteData($periodo, $especialistaId ?: null, $servicioId ? (int) $servicioId : null);
+        $data = $this->reporteService->getReporteData(
+            $periodo,
+            $especialistaId ?: null,
+            $servicioId ? (int) $servicioId : null,
+            $request->input('fecha_inicio'),
+            $request->input('fecha_fin')
+        );
 
         return Inertia::render('Reportes', [
             'filters' => $data['filters'],
@@ -46,10 +56,16 @@ class ReporteController extends Controller
 
         $especialistaId = $request->input('especialista_id') ?: null;
         $servicioId = $request->integer('servicio_id') ?: null;
+        $request->validate([
+            'fecha_inicio' => 'nullable|date',
+            'fecha_fin' => 'nullable|date|after_or_equal:fecha_inicio',
+        ]);
         $data = $this->reporteService->getReporteData(
             $request->input('periodo', 'agosto_2026'),
             $especialistaId,
-            $servicioId
+            $servicioId,
+            $request->input('fecha_inicio'),
+            $request->input('fecha_fin')
         );
 
         return response()->streamDownload(function () use ($data) {

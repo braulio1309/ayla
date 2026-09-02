@@ -13,7 +13,7 @@ class ReporteService
 {
     private const FILTRO_AYLA_ADICIONALES = 'ayla_adicionales';
 
-    public function getReporteData(?string $periodo = null, int|string|null $especialistaId = null, ?int $servicioId = null): array
+    public function getReporteData(?string $periodo = null, int|string|null $especialistaId = null, ?int $servicioId = null, ?string $fechaInicio = null, ?string $fechaFin = null): array
     {
         $periodo = $periodo ?: 'agosto_2026';
         $soloAylaAdicionales = $especialistaId === self::FILTRO_AYLA_ADICIONALES;
@@ -31,9 +31,17 @@ class ReporteService
             'servicios' => function ($query) {
                 $query->select('servicios.id', 'servicios.nombre');
             },
-        ])->where('estado', 'completado');
+        ])->where(function ($query) {
+            $query->where('cobro_anticipado', true)
+                ->orWhere(function ($subQuery) {
+                    $subQuery->where('estado', 'completado')
+                        ->where('excluir_finanzas', false);
+                });
+        });
 
-        $rango = $this->resolverRangoPeriodo($periodo);
+        $rango = $fechaInicio && $fechaFin
+            ? ['inicio' => $fechaInicio, 'fin' => $fechaFin]
+            : $this->resolverRangoPeriodo($periodo);
         if ($rango) {
             $citas->whereBetween('fecha', [$rango['inicio'], $rango['fin']]);
         }
@@ -75,11 +83,13 @@ class ReporteService
         $totalAdicionalesBs = (float) $adicionales->sum('monto_bs');
         $totalServicios = (float) $citas->sum(function ($cita) {
             $subtotal = (float) $cita->servicios->sum('pivot.precio_momento');
-            return $subtotal > 0 ? $subtotal : (float) $cita->monto_total;
+            $subtotal = $subtotal > 0 ? $subtotal : (float) $cita->monto_total;
+            return $subtotal * ($cita->cobro_anticipado ? max(1, (int) $cita->sesiones_cobradas) : 1);
         });
         $totalServiciosBs = (float) $citas->sum(function ($cita) {
             $subtotal = (float) $cita->servicios->sum('pivot.monto_bs_momento');
-            return $subtotal > 0 ? $subtotal : (float) $cita->monto_total_bs;
+            $subtotal = $subtotal > 0 ? $subtotal : (float) $cita->monto_total_bs;
+            return $subtotal * ($cita->cobro_anticipado ? max(1, (int) $cita->sesiones_cobradas) : 1);
         });
         $totalGeneral = $totalServicios + $totalAdicionales;
         $totalGeneralBs = $totalServiciosBs + $totalAdicionalesBs;
@@ -122,8 +132,12 @@ class ReporteService
 
                 $precio = (float) ($servicio->pivot->precio_momento ?? 0);
                 $precioBs = (float) ($servicio->pivot->monto_bs_momento ?? 0);
+                $factorCobro = $cita->cobro_anticipado ? max(1, (int) $cita->sesiones_cobradas) : 1;
+                $precio *= $factorCobro;
+                $precioBs *= $factorCobro;
                 $comisionPct = (float) ($servicio->pivot->comision_momento ?? ($esp->comision ?? 0));
-                $comisionMonto = (float) ($servicio->pivot->comision_monto ?? ($precio * ($comisionPct / 100)));
+                $comisionMonto = (float) ($servicio->pivot->comision_monto ?? (($precio / $factorCobro) * ($comisionPct / 100)));
+                $comisionMonto *= $factorCobro;
                 $comisionMontoBs = $precio > 0 ? round($precioBs * ($comisionMonto / $precio), 2) : 0;
 
                 $auditoriaMap[$espId]['ingreso_generado'] += $precio;
@@ -184,9 +198,12 @@ class ReporteService
                 }
                 $subtotalCita = (float) $cita->servicios->sum('pivot.precio_momento');
                 if ($subtotalCita <= 0) $subtotalCita = (float) $cita->monto_total;
+                $factorCobro = $cita->cobro_anticipado ? max(1, (int) $cita->sesiones_cobradas) : 1;
+                $subtotalCita *= $factorCobro;
 
                 $subtotalCitaBs = (float) $cita->servicios->sum('pivot.monto_bs_momento');
                 if ($subtotalCitaBs <= 0) $subtotalCitaBs = (float) $cita->monto_total_bs;
+                $subtotalCitaBs *= $factorCobro;
 
                 $pct = (float) ($cita->comision_asistente_porcentaje ?? 0);
                 $auditoriaMap[$asistenteId]['comision_asistentes'] += round($subtotalCita * ($pct / 100), 2);
@@ -271,9 +288,13 @@ class ReporteService
                     : User::find($especialistaId);
                 $precio = (float) ($servicio->pivot->precio_momento ?? 0);
                 $precioBs = (float) ($servicio->pivot->monto_bs_momento ?? 0);
+                $factorCobro = $cita->cobro_anticipado ? max(1, (int) $cita->sesiones_cobradas) : 1;
+                $precio *= $factorCobro;
+                $precioBs *= $factorCobro;
                 $comision = (float) ($servicio->pivot->comision_momento ?? ($especialista?->comision ?? 0));
                 $comisionTipo = $servicio->pivot->comision_tipo ?? 'porcentaje';
-                $comisionMonto = (float) ($servicio->pivot->comision_monto ?? ($precio * ($comision / 100)));
+                $comisionMonto = (float) ($servicio->pivot->comision_monto ?? (($precio / $factorCobro) * ($comision / 100)));
+                $comisionMonto *= $factorCobro;
 
                 return [
                     'id' => $servicio->id,
@@ -331,8 +352,12 @@ class ReporteService
                 'asistente' => $cita->asistente?->name,
                 'comision_asistente_porcentaje' => (float) ($cita->comision_asistente_porcentaje ?? 0),
                 'estado' => $cita->estado,
-                'monto' => (float) ($cita->monto_total ?? 0),
-                'monto_bs' => (float) ($cita->monto_total_bs ?? 0),
+                'monto' => $cita->cobro_anticipado
+                    ? (float) $cita->servicios->sum('pivot.precio_momento') * max(1, (int) $cita->sesiones_cobradas)
+                    : (float) ($cita->monto_total ?? 0),
+                'monto_bs' => $cita->cobro_anticipado
+                    ? (float) $cita->servicios->sum('pivot.monto_bs_momento') * max(1, (int) $cita->sesiones_cobradas)
+                    : (float) ($cita->monto_total_bs ?? 0),
                 'total_ganado_filtrado' => round($gananciaFiltrada, 2),
                 'total_ganado_filtrado_bs' => round($gananciaFiltradaBs, 2),
             ];
@@ -343,6 +368,8 @@ class ReporteService
                 'periodo' => $periodo,
                 'especialista_id' => $especialistaId,
                 'servicio_id' => $servicioId,
+                'fecha_inicio' => $fechaInicio,
+                'fecha_fin' => $fechaFin,
                 'es_semana_actual' => $periodo === 'semanal',
             ],
             'kpis' => [
@@ -355,7 +382,12 @@ class ReporteService
                 'total_negocio' => $totalNegocio,
                 'total_negocio_bs' => $totalNegocioBs,
                 'total_citas' => $citas->count(),
-                'promedio_cita' => $citas->count() > 0 ? round($citas->sum('monto_total') / $citas->count(), 2) : 0,
+                'promedio_cita' => $citas->count() > 0 ? round($citas->sum(function ($cita) {
+                    $monto = (float) $cita->monto_total;
+                    return $cita->cobro_anticipado
+                        ? (float) $cita->servicios->sum('pivot.precio_momento') * max(1, (int) $cita->sesiones_cobradas)
+                        : $monto;
+                }) / $citas->count(), 2) : 0,
                 'top_especialista' => $auditoria[0]['especialista'] ?? 'Sin datos',
                 'top_especialista_monto' => $auditoria[0]['ingreso_generado'] ?? 0,
                 'top_especialista_porcentaje' => $auditoria[0]['aporte_porcentaje'] ?? '0%',
@@ -401,6 +433,10 @@ class ReporteService
                 $precio = (float) ($servicio->pivot->precio_momento ?? 0);
                 $precioBs = (float) ($servicio->pivot->monto_bs_momento ?? 0);
                 $comision = (float) ($servicio->pivot->comision_monto ?? 0);
+                $factorCobro = $cita->cobro_anticipado ? max(1, (int) $cita->sesiones_cobradas) : 1;
+                $precio *= $factorCobro;
+                $precioBs *= $factorCobro;
+                $comision *= $factorCobro;
                 $comisionBs = $precio > 0 ? round($precioBs * ($comision / $precio), 2) : 0;
 
                 $totales['ingresos_brutos'] += $precio;
@@ -432,8 +468,11 @@ class ReporteService
             if ((int) $cita->asistente_id === $especialistaId) {
                 $subtotal = (float) $cita->servicios->sum('pivot.precio_momento');
                 if ($subtotal <= 0) $subtotal = (float) $cita->monto_total;
+                $factorCobro = $cita->cobro_anticipado ? max(1, (int) $cita->sesiones_cobradas) : 1;
+                $subtotal *= $factorCobro;
                 $subtotalBs = (float) $cita->servicios->sum('pivot.monto_bs_momento');
                 if ($subtotalBs <= 0) $subtotalBs = (float) $cita->monto_total_bs;
+                $subtotalBs *= $factorCobro;
                 $porcentaje = (float) ($cita->comision_asistente_porcentaje ?? 0);
 
                 $totales['ingresos_brutos'] += $subtotal;

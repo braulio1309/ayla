@@ -24,7 +24,7 @@
       <!-- Card de Filtros de Auditoría -->
       <div class="card-ayla p-3 mb-4">
         <form @submit.prevent="filtrarAuditoria" class="row g-3 align-items-center">
-          <div class="col-md-3">
+          <div class="col-md-4">
             <label class="form-label small text-muted mb-1">Intervalo de Tiempo</label>
             <select class="form-select" v-model="filterForm.periodo">
               <option value="hoy">Hoy</option>
@@ -35,7 +35,7 @@
             </select>
           </div>
           
-          <div class="col-md-3">
+          <div class="col-md-4">
             <label class="form-label small text-muted mb-1">Filtrar por Especialista</label>
             <select class="form-select" v-model="filterForm.especialista_id">
               <option value="">Todos los trabajadores</option>
@@ -44,7 +44,7 @@
             </select>
           </div>
 
-          <div class="col-md-3">
+          <div class="col-md-4">
             <label class="form-label small text-muted mb-1">Filtrar por Servicio</label>
             <select class="form-select" v-model="filterForm.servicio_id">
               <option value="">Todos los servicios</option>
@@ -52,10 +52,24 @@
             </select>
           </div>
 
-          <div class="col-md-3 align-self-end">
-            <button type="submit" class="btn btn-ayla-primary w-100 py-2">
-              <i class="bi bi-bar-chart-line me-1"></i> Generar Auditoría
-            </button>
+          <div class="col-12">
+            <div class="row g-3 justify-content-center align-items-end">
+              <div class="col-sm-6 col-md-3">
+                <label class="form-label small text-muted mb-1">Fecha inicial</label>
+                <input type="date" class="form-control" v-model="filterForm.fecha_inicio">
+              </div>
+
+              <div class="col-sm-6 col-md-3">
+                <label class="form-label small text-muted mb-1">Fecha final</label>
+                <input type="date" class="form-control" v-model="filterForm.fecha_fin" :min="filterForm.fecha_inicio || undefined">
+              </div>
+
+              <div class="col-sm-6 col-md-3">
+                <button type="submit" class="btn btn-ayla-primary w-100 py-2">
+                  <i class="bi bi-bar-chart-line me-1"></i> Generar Auditoría
+                </button>
+              </div>
+            </div>
           </div>
         </form>
       </div>
@@ -291,7 +305,9 @@ const props = defineProps({
 const filterForm = ref({
   periodo: props.filters?.periodo || 'agosto_2026',
   especialista_id: props.filters?.especialista_id || '',
-  servicio_id: props.filters?.servicio_id || ''
+  servicio_id: props.filters?.servicio_id || '',
+  fecha_inicio: props.filters?.fecha_inicio || '',
+  fecha_fin: props.filters?.fecha_fin || ''
 });
 
 const agendas = computed(() => props.agendas || []);
@@ -373,7 +389,9 @@ const exportarExcel = () => {
   const parametros = new URLSearchParams({
     periodo: filterForm.value.periodo || '',
     especialista_id: filterForm.value.especialista_id || '',
-    servicio_id: filterForm.value.servicio_id || ''
+    servicio_id: filterForm.value.servicio_id || '',
+    fecha_inicio: filterForm.value.fecha_inicio || '',
+    fecha_fin: filterForm.value.fecha_fin || ''
   });
 
   window.location.href = `/reportes/exportar?${parametros.toString()}`;
